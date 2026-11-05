@@ -93,8 +93,11 @@ const INITIAL_TEAM = [
   }
 ];
 
-const TASK_CATEGORIES = [
+
+ const TASK_CATEGORIES = [
   { id: "DEL", label: "DEL - Core Delivery (R&R)", color: "bg-blue-600/30 text-blue-300 border-blue-500/40" },
   { id: "STR", label: "STR - Monthly Strategic Goal", color: "bg-emerald-600/30 text-emerald-300 border-emerald-500/40" },
   { id: "LRN", label: "LRN - Applied Learning", color: "bg-purple-600/30 text-purple-300 border-purple-500/40" },
-  { id: "OPS", label: "OPS - Admin / Housekeeping", color: "bg-amber-600/30 text-amber-300 border-amber-5
+  { id: "OPS", label: "OPS - Admin / Housekeeping", color: "bg-amber-600/30 text-amber-300 border-amber-500/40" },
+  { id: "INP", label: "INP - Innovation & Testing", color: "bg-rose-600/30 text-rose-300 border-rose-500/40" }
+];
