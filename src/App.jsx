@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Flame, Award, CheckCircle, Clock, BookOpen, TrendingUp, 
-  Send, Shield, Users, User, ChevronRight, AlertCircle, Sparkles
+  Send, Shield, ChevronRight, Sparkles, RefreshCw
 } from 'lucide-react';
 
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxw-R8QfMxEghzmZGlYLnLmlN_Xz4nrtBu_PKHRsyCBWYwl7hd_JUZb9H8IFRfcb00c/exec";
 
-const INITIAL_TEAM = [
+// Day 1 Clean Baseline (Defaults to 0 streaks if sheet is loading or empty)
+const CLEAN_DAY_ONE_TEAM = [
   {
     id: "IE-001",
     name: "Jaswanth Singh",
@@ -14,11 +15,11 @@ const INITIAL_TEAM = [
     dept: "Creative & Marketing",
     level: "L3 Advanced",
     kras: "Dexter Box marketing collateral, packaging shoots, ad creatives, video editing, social media assets",
-    streak: 24,
-    xp: 3450,
+    streak: 0,
+    xp: 0,
     activeSkill: "MDF & Digital 3D CAD Design",
-    skillProgress: 85,
-    milestonesDone: 2,
+    skillProgress: 0,
+    milestonesDone: 0,
     milestonesTotal: 3
   },
   {
@@ -28,11 +29,11 @@ const INITIAL_TEAM = [
     dept: "Content & Facilitation",
     level: "L2 Independent",
     kras: "Grade 1-2 practical science sessions, weekly Reels & podcast production, AI video tools",
-    streak: 18,
-    xp: 2450,
+    streak: 0,
+    xp: 0,
     activeSkill: "Advanced AI Video Generation (Runway / Pika)",
-    skillProgress: 90,
-    milestonesDone: 2,
+    skillProgress: 0,
+    milestonesDone: 0,
     milestonesTotal: 3
   },
   {
@@ -42,11 +43,11 @@ const INITIAL_TEAM = [
     dept: "Training & Delivery",
     level: "L2 Independent",
     kras: "Daily STEM training across 4 partner schools (600+ students), student robotics projects",
-    streak: 22,
-    xp: 2800,
+    streak: 0,
+    xp: 0,
     activeSkill: "Raspberry Pi & Python for Robotics",
-    skillProgress: 75,
-    milestonesDone: 2,
+    skillProgress: 0,
+    milestonesDone: 0,
     milestonesTotal: 3
   },
   {
@@ -56,11 +57,11 @@ const INITIAL_TEAM = [
     dept: "Training & Labs",
     level: "L2 Independent",
     kras: "District-level STEM workshops across TN, hands-on robotics, drone tech & IoT modules",
-    streak: 20,
-    xp: 2600,
+    streak: 0,
+    xp: 0,
     activeSkill: "Drone Tech & Microprocessors (ESP32)",
-    skillProgress: 80,
-    milestonesDone: 2,
+    skillProgress: 0,
+    milestonesDone: 0,
     milestonesTotal: 3
   },
   {
@@ -70,11 +71,11 @@ const INITIAL_TEAM = [
     dept: "Operations & BD",
     level: "L3 Advanced",
     kras: "ATL school compliance, CSR proposal drafting, partnership pitching, renewals",
-    streak: 26,
-    xp: 3900,
+    streak: 0,
+    xp: 0,
     activeSkill: "B2B CSR Outreach & Grant Proposals",
-    skillProgress: 100,
-    milestonesDone: 2,
+    skillProgress: 0,
+    milestonesDone: 0,
     milestonesTotal: 3
   },
   {
@@ -84,11 +85,11 @@ const INITIAL_TEAM = [
     dept: "Finance & Admin",
     level: "L2 Independent",
     kras: "Zoho Books ledgers, GST return filing, sales/purchase invoicing, audit documentation",
-    streak: 25,
-    xp: 3100,
+    streak: 0,
+    xp: 0,
     activeSkill: "Zoho Books Advanced Ledgers & Costing",
-    skillProgress: 100,
-    milestonesDone: 3,
+    skillProgress: 0,
+    milestonesDone: 0,
     milestonesTotal: 3
   }
 ];
@@ -102,9 +103,10 @@ const TASK_CATEGORIES = [
 ];
 
 export default function App() {
-  const [team, setTeam] = useState(INITIAL_TEAM);
+  const [team, setTeam] = useState(CLEAN_DAY_ONE_TEAM);
   const [currentUserEmail, setCurrentUserEmail] = useState("admin");
-  const [activeTab, setActiveTab] = useState("cockpit"); // 'cockpit' | 'manager'
+  const [activeTab, setActiveTab] = useState("cockpit");
+  const [isLoading, setIsLoading] = useState(false);
 
   // Daily Check-in Form State
   const [taskCategory, setTaskCategory] = useState("DEL");
@@ -116,6 +118,41 @@ export default function App() {
 
   const isManager = currentUserEmail === "admin";
   const currentMember = team.find(m => m.name.toLowerCase().includes(currentUserEmail.split('@')[0].toLowerCase())) || team[0];
+
+  // Fetch Live Goals and Streaks from Google Sheets on load
+  const syncWithSheet = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${APPS_SCRIPT_URL}?action=getGoals&email=admin`);
+      const data = await res.json();
+      if (data.status === "success" && data.goals && data.goals.length > 0) {
+        setTeam(prev => prev.map(member => {
+          const memberGoals = data.goals.filter(g => 
+            g.employeeName.toLowerCase().includes(member.name.toLowerCase().split(" ")[0])
+          );
+          if (memberGoals.length > 0) {
+            const completed = memberGoals.filter(g => g.status === "Completed").length;
+            const latestStreak = memberGoals[0].streakDays ? Number(memberGoals[0].streakDays) : member.streak;
+            return {
+              ...member,
+              milestonesDone: completed,
+              milestonesTotal: memberGoals.length,
+              streak: latestStreak
+            };
+          }
+          return member;
+        }));
+      }
+    } catch (err) {
+      console.log("Sheet sync notice: running on clean local baseline", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    syncWithSheet();
+  }, []);
 
   const handleCheckinSubmit = async (e) => {
     e.preventDefault();
@@ -140,7 +177,7 @@ export default function App() {
         mode: "no-cors",
         headers: { "Content-Type": "text/plain" },
         body: JSON.stringify(payload)
-      }).catch(err => console.log("Background sync:", err));
+      }).catch(err => console.log("Background sync error:", err));
 
       const xpGained = 10 + (Number(learningMinutes) > 0 ? 15 : 0);
       setTeam(prev => prev.map(m => {
@@ -154,7 +191,7 @@ export default function App() {
         return m;
       }));
 
-      setToastMessage(`🔥 Streak advanced! Earned +${xpGained} XP! Logged to Google Sheet.`);
+      setToastMessage(`🔥 Day 1 streak started! Earned +${xpGained} XP! Logged to Google Sheet.`);
       setTaskDescription("");
       setBlockerNotes("");
     } catch (err) {
@@ -178,12 +215,20 @@ export default function App() {
               <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">
                 Ascend Tracker
               </span>
-              <span className="text-xs text-slate-500 block">Infinite Engineers</span>
+              <span className="text-xs text-slate-500 block">Day 1 Live Environment</span>
             </div>
           </div>
 
-          {/* User & Role Switcher */}
+          {/* Sync status & User Switcher */}
           <div className="flex items-center gap-3">
+            <button
+              onClick={syncWithSheet}
+              title="Sync with Google Sheet"
+              className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin text-blue-400' : ''}`} />
+            </button>
+
             <div className="flex items-center gap-2 bg-slate-800/80 p-1 rounded-lg border border-slate-700 text-xs">
               <button 
                 onClick={() => { setCurrentUserEmail("admin"); setActiveTab("manager"); }}
@@ -227,9 +272,11 @@ export default function App() {
         {activeTab === "manager" ? (
           /* ================= MANAGER / FOUNDER VIEW ================= */
           <div className="space-y-6">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Leadership Dashboard</h1>
-              <p className="text-sm text-slate-400">Team execution streaks, milestone progress, and active learning across all tracks</p>
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">Leadership Dashboard</h1>
+                <p className="text-sm text-slate-400">Team execution streaks, milestone progress, and active learning</p>
+              </div>
             </div>
 
             {/* KPI Cards */}
@@ -237,27 +284,29 @@ export default function App() {
               <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
                 <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Active Team Headcount</span>
                 <div className="text-2xl font-bold mt-1 text-white">{team.length} Members</div>
-                <span className="text-xs text-emerald-400 mt-1 block">100% Onboarded</span>
+                <span className="text-xs text-emerald-400 mt-1 block">Ready for Day 1</span>
               </div>
               <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
-                <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Avg Team Streak</span>
+                <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Current Team Streak</span>
                 <div className="text-2xl font-bold mt-1 text-amber-400 flex items-center gap-1">
                   <Flame className="h-6 w-6 text-amber-500 fill-amber-500" />
                   {Math.round(team.reduce((acc, curr) => acc + curr.streak, 0) / team.length)} Days
                 </div>
-                <span className="text-xs text-slate-400 mt-1 block">Daily task adherence</span>
+                <span className="text-xs text-slate-400 mt-1 block">Awaiting today's check-ins</span>
               </div>
               <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
                 <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Milestone Delivery</span>
                 <div className="text-2xl font-bold mt-1 text-blue-400">
-                  {Math.round((team.reduce((acc, curr) => acc + curr.milestonesDone, 0) / team.reduce((acc, curr) => acc + curr.milestonesTotal, 0)) * 100)}%
+                  {team.reduce((acc, curr) => acc + curr.milestonesTotal, 0) > 0 
+                    ? Math.round((team.reduce((acc, curr) => acc + curr.milestonesDone, 0) / team.reduce((acc, curr) => acc + curr.milestonesTotal, 0)) * 100) 
+                    : 0}%
                 </div>
-                <span className="text-xs text-slate-400 mt-1 block">Current monthly targets</span>
+                <span className="text-xs text-slate-400 mt-1 block">New cycle starting</span>
               </div>
               <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
                 <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Active Learners</span>
                 <div className="text-2xl font-bold mt-1 text-purple-400">{team.length} / {team.length}</div>
-                <span className="text-xs text-purple-400 mt-1 block">Upskilling in progress</span>
+                <span className="text-xs text-purple-400 mt-1 block">Upskilling tracks active</span>
               </div>
             </div>
 
@@ -265,7 +314,7 @@ export default function App() {
             <div className="bg-slate-900/80 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
               <div className="px-5 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900">
                 <h3 className="font-semibold text-sm text-slate-200">Team Performance & Growth Rollup</h3>
-                <span className="text-xs text-slate-400">Synced with Master Google Sheet</span>
+                <span className="text-xs text-slate-400">Live synced with Google Sheet</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -302,7 +351,7 @@ export default function App() {
                           <div className="w-28 bg-slate-800 h-1.5 rounded-full overflow-hidden">
                             <div 
                               className="bg-blue-500 h-full rounded-full" 
-                              style={{ width: `${(member.milestonesDone / member.milestonesTotal) * 100}%` }}
+                              style={{ width: `${member.milestonesTotal > 0 ? (member.milestonesDone / member.milestonesTotal) * 100 : 0}%` }}
                             />
                           </div>
                         </td>
@@ -376,7 +425,7 @@ export default function App() {
                   <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-ping" />
                   <h3 className="font-semibold text-base text-slate-100">Daily 60-Second Check-In</h3>
                 </div>
-                <span className="text-xs text-slate-400">Maintains daily execution streak</span>
+                <span className="text-xs text-slate-400">Day 1: Start your execution streak</span>
               </div>
 
               <form onSubmit={handleCheckinSubmit} className="space-y-4">
@@ -414,75 +463,4 @@ export default function App() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs text-slate-400 font-medium block mb-1.5">Learning Minutes Spent Today</label>
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-slate-500" />
-                      <input
-                        type="number"
-                        min="0"
-                        step="5"
-                        value={learningMinutes}
-                        onChange={(e) => setLearningMinutes(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
-                      />
-                      <span className="text-xs text-slate-500">Mins</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-400 font-medium block mb-1.5">Blocker / Dependency (Optional)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g., Awaiting sensor restocking from vendor"
-                      value={blockerNotes}
-                      onChange={(e) => setBlockerNotes(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium py-2.5 rounded-xl shadow-lg shadow-blue-600/20 text-sm flex items-center justify-center gap-2 transition disabled:opacity-50"
-                >
-                  <Send className="h-4 w-4" />
-                  {isSubmitting ? "Logging to Google Sheet..." : "Submit Daily Check-In (+25 XP)"}
-                </button>
-              </form>
-            </div>
-
-            {/* R&R & Growth Roadmap */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <BookOpen className="h-4 w-4 text-blue-400" />
-                  <h4 className="font-semibold text-sm text-slate-200">Role Baseline & Core KRAs</h4>
-                </div>
-                <p className="text-xs text-slate-400 leading-relaxed bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80">
-                  {currentMember.kras}
-                </p>
-              </div>
-
-              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <TrendingUp className="h-4 w-4 text-purple-400" />
-                  <h4 className="font-semibold text-sm text-slate-200">Active Learning Quest</h4>
-                </div>
-                <div className="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80 space-y-2">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-medium text-purple-300">{currentMember.activeSkill}</span>
-                    <span className="text-slate-400">{currentMember.skillProgress}% Complete</span>
-                  </div>
-                  <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-purple-500 h-full rounded-full" style={{ width: `${currentMember.skillProgress}%` }} />
-                  </div>
-                  <span className="text-[11px] text-slate-500 block">Requires 1 verified proof artifact for next level gate.</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
-  );
-}
+                    <label className="text-xs text-slate-400 font-medium block mb-1.5">Learning Minutes Spent Today
