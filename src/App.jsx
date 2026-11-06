@@ -5,7 +5,7 @@ import {
   ListPlus, CalendarCheck, CheckSquare, Zap, GraduationCap, LayoutGrid
 } from 'lucide-react';
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxRIiZByNoJ3Bh_FvFvLMmrZp1qLlUDkjue_4rZlyHRx5gW42XLXaD_wLQ7SvKl5AySTA/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz7ZFH8WtVf33bh98R9eMwo4rCYr4Evk2WeHmYdkjKgFgCGrrEPMFxrYwX0bQlZSrjUhQ/exec";
 
 function getCurrentMonday() {
   const d = new Date();
@@ -15,10 +15,11 @@ function getCurrentMonday() {
 }
 
 export default function App() {
-  const [viewRole, setViewRole] = useState("founder");
+  const [viewRole, setViewRole] = useState("founder"); // 'founder' | 'employee'
   const [activeEmployeeEmail, setActiveEmployeeEmail] = useState("");
-  const [activeTab, setActiveTab] = useState("daily");
+  const [activeTab, setActiveTab] = useState("daily"); // 'daily' | 'weekly' | 'catalog' | 'rnr'
   
+  // Sheet Data
   const [employees, setEmployees] = useState([]);
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -28,16 +29,19 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
+  // Modals
   const [showEmpModal, setShowEmpModal] = useState(false);
   const [showPrjModal, setShowPrjModal] = useState(false);
   const [showTskModal, setShowTskModal] = useState(false);
   const [showLrnModal, setShowLrnModal] = useState(false);
 
+  // Forms
   const [newEmp, setNewEmp] = useState({ name: "", email: "", roleTitle: "", department: "Training & Delivery", level: "L3 Advanced", rnrSummary: "" });
   const [newPrj, setNewPrj] = useState({ projectId: "", projectName: "", priority: "P1 Critical", ownerEmail: "" });
   const [newTsk, setNewTsk] = useState({ taskCode: "", taskTitle: "", category: "DEL" });
   const [newLrn, setNewLrn] = useState({ moduleCode: "", domain: "STEM Hardware", topicTitle: "", targetProficiency: "Intermediate" });
 
+  // Logging State
   const [selectedProject, setSelectedProject] = useState("");
   const [selectedTaskCode, setSelectedTaskCode] = useState("");
   const [taskHours, setTaskHours] = useState("2.0");
@@ -47,6 +51,7 @@ export default function App() {
   const [dailyNotes, setDailyNotes] = useState("");
   const [isSubmittingDaily, setIsSubmittingDaily] = useState(false);
 
+  // Cadence State
   const [mondayCommitment, setMondayCommitment] = useState("");
   const [mondayProject, setMondayProject] = useState("");
   const [isSubmittingMonday, setIsSubmittingMonday] = useState(false);
@@ -125,57 +130,146 @@ export default function App() {
     return thisWeekLogs.reduce((acc, curr) => acc + Number(curr.Learning_Hours || 0), 0);
   }, [thisWeekLogs]);
 
+  // Founder Creation Handlers (Optimistic UI + Background Sync)
   const handleAddEmployee = async (e) => {
     e.preventDefault();
+    const employeeEntry = {
+      Emp_ID: "IE-" + ("00" + (employees.length + 1)).slice(-3),
+      Name: newEmp.name,
+      Email: newEmp.email.toLowerCase().trim(),
+      Role_Title: newEmp.roleTitle,
+      Department: newEmp.department,
+      Level: newEmp.level,
+      "R&R_Summary": newEmp.rnrSummary,
+      Status: "Active"
+    };
+
+    setEmployees(prev => [...prev, employeeEntry]);
+    if (!activeEmployeeEmail) setActiveEmployeeEmail(employeeEntry.Email);
+    setShowEmpModal(false);
+    showToast(`Employee ${newEmp.name} onboarded!`);
+
     try {
-      await fetch(APPS_SCRIPT_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: "addEmployee", ...newEmp }) });
-      showToast(`Employee ${newEmp.name} onboarded!`);
-      setShowEmpModal(false);
-      setEmployees(prev => [...prev, { ...newEmp, Emp_ID: "IE-" + (prev.length + 1) }]);
-      if (!activeEmployeeEmail) setActiveEmployeeEmail(newEmp.email);
-      setNewEmp({ name: "", email: "", roleTitle: "", department: "Training & Delivery", level: "L3 Advanced", rnrSummary: "" });
-    } catch { showToast("Error adding employee"); }
+      fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: "addEmployee", ...newEmp })
+      });
+    } catch (err) {
+      console.log("Sheet post error:", err);
+    }
+
+    setNewEmp({ name: "", email: "", roleTitle: "", department: "Training & Delivery", level: "L3 Advanced", rnrSummary: "" });
   };
 
   const handleAddProject = async (e) => {
     e.preventDefault();
+    const projectEntry = {
+      Project_ID: newPrj.projectId.toUpperCase().trim(),
+      Project_Name: newPrj.projectName,
+      Priority_Level: newPrj.priority,
+      Owner_Email: (newPrj.ownerEmail || "").toLowerCase().trim(),
+      Status: "Active"
+    };
+
+    setProjects(prev => [...prev, projectEntry]);
+    if (!selectedProject) {
+      setSelectedProject(projectEntry.Project_ID);
+      setMondayProject(projectEntry.Project_ID);
+    }
+    setShowPrjModal(false);
+    showToast(`Project ${newPrj.projectId} created!`);
+
     try {
-      await fetch(APPS_SCRIPT_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: "createProject", ...newPrj }) });
-      showToast(`Project ${newPrj.projectId} created!`);
-      setShowPrjModal(false);
-      setProjects(prev => [...prev, { ...newPrj, Project_ID: newPrj.projectId.toUpperCase(), Project_Name: newPrj.projectName }]);
-      if (!selectedProject) setSelectedProject(newPrj.projectId.toUpperCase());
-      setNewPrj({ projectId: "", projectName: "", priority: "P1 Critical", ownerEmail: "" });
-    } catch { showToast("Error creating project"); }
+      fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: "createProject", ...newPrj })
+      });
+    } catch (err) {
+      console.log("Sheet post error:", err);
+    }
+
+    setNewPrj({ projectId: "", projectName: "", priority: "P1 Critical", ownerEmail: "" });
   };
 
   const handleAddTask = async (e) => {
     e.preventDefault();
+    const taskEntry = {
+      Task_Code: newTsk.taskCode.toUpperCase().trim(),
+      Task_Title: newTsk.taskTitle,
+      Category: newTsk.category
+    };
+
+    setTasks(prev => [...prev, taskEntry]);
+    if (!selectedTaskCode) setSelectedTaskCode(taskEntry.Task_Code);
+    setShowTskModal(false);
+    showToast(`Global task code ${newTsk.taskCode} added to library!`);
+
     try {
-      await fetch(APPS_SCRIPT_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: "createTask", ...newTsk }) });
-      showToast(`Global task code ${newTsk.taskCode} added to library!`);
-      setShowTskModal(false);
-      setTasks(prev => [...prev, { Task_Code: newTsk.taskCode.toUpperCase(), Task_Title: newTsk.taskTitle, Category: newTsk.category }]);
-      if (!selectedTaskCode) setSelectedTaskCode(newTsk.taskCode.toUpperCase());
-      setNewTsk({ taskCode: "", taskTitle: "", category: "DEL" });
-    } catch { showToast("Error adding task"); }
+      fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: "createTask", ...newTsk })
+      });
+    } catch (err) {
+      console.log("Sheet post error:", err);
+    }
+
+    setNewTsk({ taskCode: "", taskTitle: "", category: "DEL" });
   };
 
   const handleAddLearningModule = async (e) => {
     e.preventDefault();
+    const learningEntry = {
+      Module_Code: newLrn.moduleCode.toUpperCase().trim(),
+      Domain: newLrn.domain,
+      Topic_Title: newLrn.topicTitle,
+      Target_Proficiency: newLrn.targetProficiency
+    };
+
+    setLearningModules(prev => [...prev, learningEntry]);
+    setShowLrnModal(false);
+    showToast(`Learning module ${newLrn.moduleCode} added!`);
+
     try {
-      await fetch(APPS_SCRIPT_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: "createLearningModule", ...newLrn }) });
-      showToast(`Learning module ${newLrn.moduleCode} added!`);
-      setShowLrnModal(false);
-      setLearningModules(prev => [...prev, { Module_Code: newLrn.moduleCode.toUpperCase(), Domain: newLrn.domain, Topic_Title: newLrn.topicTitle, Target_Proficiency: newLrn.targetProficiency }]);
-      setNewLrn({ moduleCode: "", domain: "STEM Hardware", topicTitle: "", targetProficiency: "Intermediate" });
-    } catch { showToast("Error adding learning module"); }
+      fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: "createLearningModule", ...newLrn })
+      });
+    } catch (err) {
+      console.log("Sheet post error:", err);
+    }
+
+    setNewLrn({ moduleCode: "", domain: "STEM Hardware", topicTitle: "", targetProficiency: "Intermediate" });
   };
 
+  // Employee Logging Handlers
   const handleDailySubmit = async (e) => {
     e.preventDefault();
     if (!selectedProject || !selectedTaskCode) { showToast("Please select both a project and a task code"); return; }
     setIsSubmittingDaily(true);
+
+    const logEntry = {
+      Log_ID: "LOG-" + Date.now(),
+      Date: new Date().toISOString().split('T')[0],
+      Emp_Email: activeEmployeeEmail,
+      Project_ID: selectedProject,
+      Task_Code: selectedTaskCode,
+      Task_Hours: taskHours,
+      Learning_Module_Code: selectedLearningModule || "None",
+      Learning_Hours: learningHours,
+      Status: taskStatus,
+      Streak_Count: currentStreak + 1
+    };
+
+    setDailyLogs(prev => [...prev, logEntry]);
+    showToast("🔥 Task logged! Streak advanced.");
 
     const payload = {
       action: "submitDailyLog",
@@ -191,29 +285,38 @@ export default function App() {
     };
 
     try {
-      await fetch(APPS_SCRIPT_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(payload) });
-      showToast("🔥 Task paired to project & logged! Streak advanced.");
-      setDailyLogs(prev => [...prev, {
-        Log_ID: "LOG-" + Date.now(),
-        Date: new Date().toISOString().split('T')[0],
-        Emp_Email: activeEmployeeEmail,
-        Project_ID: selectedProject,
-        Task_Code: selectedTaskCode,
-        Task_Hours: taskHours,
-        Learning_Module_Code: selectedLearningModule || "None",
-        Learning_Hours: learningHours,
-        Status: taskStatus,
-        Streak_Count: currentStreak + 1
-      }]);
+      fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify(payload)
+      });
       setDailyNotes("");
-    } catch { showToast("Logged locally!"); }
-    finally { setIsSubmittingDaily(false); }
+    } catch (err) {
+      console.log("Sheet post error:", err);
+    } finally {
+      setIsSubmittingDaily(false);
+    }
   };
 
   const handleMondaySubmit = async (e) => {
     e.preventDefault();
     if (!mondayCommitment.trim()) return;
     setIsSubmittingMonday(true);
+
+    const pulseEntry = {
+      Pulse_ID: "PLS-" + Date.now(),
+      Week_Start_Date: currentMondayStr,
+      Emp_Email: activeEmployeeEmail,
+      Project_ID: mondayProject,
+      Monday_Commitment: mondayCommitment,
+      Auto_Task_Hours: 0,
+      Auto_Learning_Hours: 0,
+      Status: "Committed"
+    };
+
+    setWeeklyPulses(prev => [...prev, pulseEntry]);
+    showToast("🎯 Monday goal committed! (+20 XP)");
 
     const payload = {
       action: "submitMondayCommitment",
@@ -224,21 +327,18 @@ export default function App() {
     };
 
     try {
-      await fetch(APPS_SCRIPT_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(payload) });
-      showToast("🎯 Monday goal committed! (+20 XP)");
-      setWeeklyPulses(prev => [...prev, {
-        Pulse_ID: "PLS-" + Date.now(),
-        Week_Start_Date: currentMondayStr,
-        Emp_Email: activeEmployeeEmail,
-        Project_ID: mondayProject,
-        Monday_Commitment: mondayCommitment,
-        Auto_Task_Hours: 0,
-        Auto_Learning_Hours: 0,
-        Status: "Committed"
-      }]);
+      fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify(payload)
+      });
       setMondayCommitment("");
-    } catch { showToast("Saved locally!"); }
-    finally { setIsSubmittingMonday(false); }
+    } catch (err) {
+      console.log("Sheet post error:", err);
+    } finally {
+      setIsSubmittingMonday(false);
+    }
   };
 
   const handleFridaySubmit = async (e) => {
@@ -258,12 +358,20 @@ export default function App() {
     };
 
     try {
-      await fetch(APPS_SCRIPT_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(payload) });
+      fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify(payload)
+      });
       showToast("🎉 Friday review auto-submitted! (+50 XP)");
-      fetchSheetData();
       setFridayOutcome("");
-    } catch { showToast("Pulse saved locally!"); }
-    finally { setIsSubmittingFriday(false); }
+      setTimeout(fetchSheetData, 1500);
+    } catch (err) {
+      console.log("Sheet post error:", err);
+    } finally {
+      setIsSubmittingFriday(false);
+    }
   };
 
   return (
