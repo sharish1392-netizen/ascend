@@ -106,7 +106,7 @@ export default function App() {
     Role_Title: "Onboard via Founder View",
     Department: "General",
     Level: "L1",
-    R&R_Summary: "Responsibilities will appear once onboarded."
+    "R&R_Summary": "Responsibilities will appear once onboarded."
   };
 
   const empDailyLogs = dailyLogs.filter(l => (l.Emp_Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase());
