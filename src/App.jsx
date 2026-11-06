@@ -15,11 +15,10 @@ function getCurrentMonday() {
 }
 
 export default function App() {
-  const [viewRole, setViewRole] = useState("founder"); // 'founder' | 'employee'
+  const [viewRole, setViewRole] = useState("founder");
   const [activeEmployeeEmail, setActiveEmployeeEmail] = useState("");
-  const [activeTab, setActiveTab] = useState("daily"); // 'daily' | 'weekly' | 'catalog' | 'rnr'
+  const [activeTab, setActiveTab] = useState("daily");
   
-  // Clean State synced with Google Sheets
   const [employees, setEmployees] = useState([]);
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -29,19 +28,16 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
-  // Founder Creation Modals
   const [showEmpModal, setShowEmpModal] = useState(false);
   const [showPrjModal, setShowPrjModal] = useState(false);
   const [showTskModal, setShowTskModal] = useState(false);
   const [showLrnModal, setShowLrnModal] = useState(false);
 
-  // Forms
   const [newEmp, setNewEmp] = useState({ name: "", email: "", roleTitle: "", department: "Training & Delivery", level: "L3 Advanced", rnrSummary: "" });
   const [newPrj, setNewPrj] = useState({ projectId: "", projectName: "", priority: "P1 Critical", ownerEmail: "" });
   const [newTsk, setNewTsk] = useState({ taskCode: "", taskTitle: "", category: "DEL" });
   const [newLrn, setNewLrn] = useState({ moduleCode: "", domain: "STEM Hardware", topicTitle: "", targetProficiency: "Intermediate" });
 
-  // Logging State
   const [selectedProject, setSelectedProject] = useState("");
   const [selectedTaskCode, setSelectedTaskCode] = useState("");
   const [taskHours, setTaskHours] = useState("2.0");
@@ -51,7 +47,6 @@ export default function App() {
   const [dailyNotes, setDailyNotes] = useState("");
   const [isSubmittingDaily, setIsSubmittingDaily] = useState(false);
 
-  // Cadence State
   const [mondayCommitment, setMondayCommitment] = useState("");
   const [mondayProject, setMondayProject] = useState("");
   const [isSubmittingMonday, setIsSubmittingMonday] = useState(false);
@@ -130,7 +125,6 @@ export default function App() {
     return thisWeekLogs.reduce((acc, curr) => acc + Number(curr.Learning_Hours || 0), 0);
   }, [thisWeekLogs]);
 
-  // Founder Creation Handlers
   const handleAddEmployee = async (e) => {
     e.preventDefault();
     try {
@@ -178,7 +172,6 @@ export default function App() {
     } catch { showToast("Error adding learning module"); }
   };
 
-  // Employee Logging Handlers
   const handleDailySubmit = async (e) => {
     e.preventDefault();
     if (!selectedProject || !selectedTaskCode) { showToast("Please select both a project and a task code"); return; }
@@ -334,7 +327,6 @@ export default function App() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full">
         {viewRole === "founder" ? (
-          /* ================= FOUNDER VIEW ================= */
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
@@ -357,7 +349,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
                 <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Active Team Roster</span>
@@ -381,7 +372,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Team Roster Grid */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-xl overflow-hidden">
               <div className="px-5 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900">
                 <h3 className="font-semibold text-sm text-slate-200">Team Roster</h3>
@@ -436,7 +426,6 @@ export default function App() {
               )}
             </div>
 
-            {/* Weekly Rollup */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-xl overflow-hidden">
               <div className="px-5 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900">
                 <h3 className="font-semibold text-sm text-slate-200">Company Execution & Learning Rollup</h3>
@@ -485,7 +474,6 @@ export default function App() {
             </div>
           </div>
         ) : (
-          /* ================= EMPLOYEE COCKPIT ================= */
           <div className="space-y-6">
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
@@ -536,7 +524,6 @@ export default function App() {
               </button>
             </div>
 
-            {/* TAB 1: DAILY DUAL-TRACK LOGGER */}
             {activeTab === "daily" && (
               <div className="bg-slate-900/80 border border-blue-500/30 rounded-2xl p-5 shadow-xl shadow-blue-950/20">
                 <div className="flex items-center justify-between mb-4">
@@ -619,7 +606,6 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB 2: WEEKLY CADENCE */}
             {activeTab === "weekly" && (
               <div className="space-y-6">
                 <div className="bg-slate-900/80 border border-blue-500/30 rounded-2xl p-5 shadow-xl">
@@ -693,7 +679,6 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB 3: COMPANY CATALOG & LIBRARIES */}
             {activeTab === "catalog" && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -765,7 +750,6 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB 4: R&R */}
             {activeTab === "rnr" && (
               <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
                 <div className="flex items-center gap-2 mb-3">
@@ -773,7 +757,7 @@ export default function App() {
                   <h4 className="font-semibold text-sm text-slate-200">Role Baseline & Permanent KRAs</h4>
                 </div>
                 <p className="text-sm text-slate-300 leading-relaxed bg-slate-950/60 p-4 rounded-xl border border-slate-800">
-                  {currentEmp.R&R_Summary}
+                  {currentEmp["R&R_Summary"]}
                 </p>
               </div>
             )}
@@ -781,7 +765,6 @@ export default function App() {
         )}
       </main>
 
-      {/* FOUNDER MODALS */}
       {showEmpModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
