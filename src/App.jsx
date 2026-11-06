@@ -3,10 +3,11 @@ import {
   Flame, Award, CheckCircle, Clock, BookOpen, Send, Shield, 
   ChevronRight, Sparkles, RefreshCw, FolderPlus, UserPlus, 
   ListPlus, CalendarCheck, CheckSquare, Zap, GraduationCap, LayoutGrid,
-  Plus, Trash2, CheckCircle2, AlertCircle, BarChart3, Sliders
+  Plus, Trash2, CheckCircle2, AlertCircle, BarChart3, Sliders, ArrowUpRight, 
+  UserCheck, Users, PieChart, Activity, Calendar
 } from 'lucide-react';
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz7ZFH8WtVf33bh98R9eMwo4rCYr4Evk2WeHmYdkjKgFgCGrrEPMFxrYwX0bQlZSrjUhQ/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw9dwtPvz3EOGWNDcSSFxCUQftWb7zDa632MatuA1MzMQIYlHSuDr8ZpF6ZfCJzY7t6Iw/exec";
 
 function getCurrentMonday() {
   const d = new Date();
@@ -15,10 +16,15 @@ function getCurrentMonday() {
   return new Date(d.setDate(diff)).toISOString().split('T')[0];
 }
 
+function getTodayStr() {
+  return new Date().toISOString().split('T')[0];
+}
+
 export default function App() {
   const [viewRole, setViewRole] = useState("founder"); // 'founder' | 'employee'
   const [activeEmployeeEmail, setActiveEmployeeEmail] = useState("");
-  const [activeTab, setActiveTab] = useState("daily"); // 'daily' | 'weekly' | 'catalog' | 'levels' | 'rnr'
+  const [founderTab, setFounderTab] = useState("workload"); // 'workload' | 'analytics' | 'live' | 'team'
+  const [employeeTab, setEmployeeTab] = useState("workboard"); // 'workboard' | 'levels' | 'catalog' | 'rnr'
   
   // Sheet Data
   const [employees, setEmployees] = useState([]);
@@ -30,48 +36,39 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
-  // Founder Creation Modals
+  // Founder Filtering States
+  const [selectedFounderEmp, setSelectedFounderEmp] = useState("ALL");
+  const [analyticsTimeframe, setAnalyticsTimeframe] = useState("WEEK"); // 'WEEK' | 'MONTH' | 'ALL'
+
+  // Modals
   const [showEmpModal, setShowEmpModal] = useState(false);
   const [showPrjModal, setShowPrjModal] = useState(false);
   const [showTskModal, setShowTskModal] = useState(false);
-  const [showLrnModal, setShowLrnModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
 
-  // Forms for Founder
+  // In-Card Logging Modal
+  const [activeLoggingItem, setActiveLoggingItem] = useState(null);
+  const [sessionSliderHours, setSessionSliderHours] = useState(1);
+  const [sessionSliderMins, setSessionSliderMins] = useState(30);
+  const [sessionProgress, setSessionProgress] = useState(50);
+  const [sessionLearningModule, setSessionLearningModule] = useState("None");
+  const [sessionNotes, setSessionNotes] = useState("");
+  const [isSubmittingSession, setIsSubmittingSession] = useState(false);
+
+  // Add Item / Assign Task Form
+  const [newItemProject, setNewItemProject] = useState("");
+  const [newItemTaskCode, setNewItemTaskCode] = useState("");
+  const [newItemTitle, setNewItemTitle] = useState("");
+  const [assigneeEmail, setAssigneeEmail] = useState("");
+  const [isAddingItem, setIsAddingItem] = useState(false);
+
+  // Forms
   const [newEmp, setNewEmp] = useState({ name: "", email: "", roleTitle: "", department: "Training & Delivery", level: "L3 Advanced", rnrSummary: "" });
   const [newPrj, setNewPrj] = useState({ projectId: "", projectName: "", priority: "P1 Critical", ownerEmail: "" });
   const [newTsk, setNewTsk] = useState({ taskCode: "", taskTitle: "", category: "DEL" });
-  const [newLrn, setNewLrn] = useState({ moduleCode: "", domain: "STEM Hardware", topicTitle: "", targetProficiency: "Intermediate" });
-
-  // Dual Hour & Minute Sliders State (Daily Logger)
-  const [taskSliderHours, setTaskSliderHours] = useState(1);
-  const [taskSliderMins, setTaskSliderMins] = useState(30);
-  const totalTaskMins = (Number(taskSliderHours) * 60) + Number(taskSliderMins);
-
-  const [lrnSliderHours, setLrnSliderHours] = useState(0);
-  const [lrnSliderMins, setLrnSliderMins] = useState(30);
-  const totalLrnMins = (Number(lrnSliderHours) * 60) + Number(lrnSliderMins);
-
-  // Multi-Entry Daily Logger Staging Queue
-  const [selectedProject, setSelectedProject] = useState("");
-  const [selectedTaskCode, setSelectedTaskCode] = useState("");
-  const [selectedLearningModule, setSelectedLearningModule] = useState("None");
-  const [dailyNotes, setDailyNotes] = useState("");
-  const [taskStatus, setTaskStatus] = useState("Done");
-  const [stagedLogs, setStagedLogs] = useState([]);
-  const [isSubmittingBatch, setIsSubmittingBatch] = useState(false);
-
-  // Monday Structured Commitment Matrix State
-  const [mondayProject, setMondayProject] = useState("");
-  const [mondayTaskCode, setMondayTaskCode] = useState("");
-  const [mondayGoalText, setMondayGoalText] = useState("");
-  const [stagedCommitments, setStagedCommitments] = useState([]);
-  const [isSubmittingMonday, setIsSubmittingMonday] = useState(false);
-
-  // Friday Reflection State
-  const [fridayOutcome, setFridayOutcome] = useState("");
-  const [isSubmittingFriday, setIsSubmittingFriday] = useState(false);
 
   const currentMondayStr = getCurrentMonday();
+  const todayStr = getTodayStr();
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -93,18 +90,17 @@ export default function App() {
 
         if (data.employees?.length > 0 && !activeEmployeeEmail) {
           setActiveEmployeeEmail(data.employees[0].Email);
+          setAssigneeEmail(data.employees[0].Email);
         }
-        if (data.projects?.length > 0 && !selectedProject) {
-          setSelectedProject(data.projects[0].Project_ID);
-          setMondayProject(data.projects[0].Project_ID);
+        if (data.projects?.length > 0 && !newItemProject) {
+          setNewItemProject(data.projects[0].Project_ID);
         }
-        if (data.tasks?.length > 0 && !selectedTaskCode) {
-          setSelectedTaskCode(data.tasks[0].Task_Code);
-          setMondayTaskCode(data.tasks[0].Task_Code);
+        if (data.tasks?.length > 0 && !newItemTaskCode) {
+          setNewItemTaskCode(data.tasks[0].Task_Code);
         }
       }
     } catch (err) {
-      console.log("Sheet sync notice:", err);
+      console.log("Sheet fetch notice:", err);
     } finally {
       setIsLoading(false);
     }
@@ -127,71 +123,113 @@ export default function App() {
   const currentStreak = empDailyLogs.length > 0 ? Number(empDailyLogs[empDailyLogs.length - 1].Streak_Count || 0) : 0;
   const currentXP = empDailyLogs.length * 35;
 
-  // Filter logs recorded this week
-  const thisWeekLogs = useMemo(() => {
-    return empDailyLogs.filter(l => l.Date >= currentMondayStr);
-  }, [empDailyLogs, currentMondayStr]);
-
-  // Total task minutes and hours
-  const autoTaskMinutesTotal = useMemo(() => {
-    return thisWeekLogs.reduce((acc, curr) => {
-      const val = Number(curr.Task_Hours || 0);
-      return acc + (val > 24 ? val : Math.round(val * 60));
-    }, 0);
-  }, [thisWeekLogs]);
-
-  const autoLearningMinutesTotal = useMemo(() => {
-    return thisWeekLogs.reduce((acc, curr) => {
-      const val = Number(curr.Learning_Hours || 0);
-      return acc + (val > 24 ? val : Math.round(val * 60));
-    }, 0);
-  }, [thisWeekLogs]);
-
-  // Current Week's Pulses for Active Employee
-  const currentWeekPulses = weeklyPulses.filter(p => 
+  const currentWorkboard = weeklyPulses.filter(p => 
     (p.Emp_Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase() &&
     p.Week_Start_Date === currentMondayStr
   );
 
-  // Reconcile Monday Commitments against Actual Logged Tasks
-  const weeklyReconciliation = useMemo(() => {
-    if (currentWeekPulses.length === 0) return { total: 0, completed: 0, percent: 0, items: [] };
+  const collectionMetrics = useMemo(() => {
+    if (currentWorkboard.length === 0) return { percent: 0, totalMinutes: 0, completedCount: 0 };
+    const totalProg = currentWorkboard.reduce((acc, c) => acc + Number(c.Auto_Task_Hours || 0), 0);
+    const totalMins = currentWorkboard.reduce((acc, c) => acc + Number(c.Auto_Learning_Hours || 0), 0);
+    const completed = currentWorkboard.filter(c => Number(c.Auto_Task_Hours || 0) >= 100).length;
+    return {
+      percent: Math.round(totalProg / currentWorkboard.length),
+      totalMinutes: totalMins,
+      completedCount: completed
+    };
+  }, [currentWorkboard]);
 
-    let completedCount = 0;
-    const items = currentWeekPulses.map(pulse => {
-      // Find matching daily logs for same project and task code
-      const matching = thisWeekLogs.filter(log => 
-        log.Project_ID === pulse.Project_ID && 
-        (pulse.Task_Code ? log.Task_Code === pulse.Task_Code : true)
-      );
-      
-      const loggedMins = matching.reduce((sum, l) => {
-        const v = Number(l.Task_Hours || 0);
-        return sum + (v > 24 ? v : Math.round(v * 60));
-      }, 0);
+  const filteredAnalyticsLogs = useMemo(() => {
+    const now = new Date();
+    const currentMonthPrefix = now.toISOString().slice(0, 7);
 
-      const isDone = matching.length > 0;
-      if (isDone) completedCount++;
+    return dailyLogs.filter(log => {
+      if (selectedFounderEmp !== "ALL" && (log.Emp_Email || "").toLowerCase() !== selectedFounderEmp.toLowerCase()) {
+        return false;
+      }
+      if (analyticsTimeframe === "WEEK") {
+        return (log.Date || "") >= currentMondayStr;
+      }
+      if (analyticsTimeframe === "MONTH") {
+        return (log.Date || "").startsWith(currentMonthPrefix);
+      }
+      return true;
+    });
+  }, [dailyLogs, selectedFounderEmp, analyticsTimeframe, currentMondayStr]);
 
-      return {
-        pulseId: pulse.Pulse_ID,
-        project: pulse.Project_ID,
-        taskCode: pulse.Task_Code || "General",
-        commitment: pulse.Monday_Commitment,
-        entriesCount: matching.length,
-        loggedMinutes: loggedMins,
-        isCompleted: isDone
-      };
+  const projectTimeBreakdown = useMemo(() => {
+    const map = {};
+    let grandTotalMins = 0;
+
+    filteredAnalyticsLogs.forEach(log => {
+      const p = log.Project_ID || "UNASSIGNED";
+      const val = Number(log.Task_Hours || 0);
+      const mins = val > 24 ? val : Math.round(val * 60);
+      map[p] = (map[p] || 0) + mins;
+      grandTotalMins += mins;
     });
 
-    const percent = Math.round((completedCount / currentWeekPulses.length) * 100);
-    return { total: currentWeekPulses.length, completed: completedCount, percent, items };
-  }, [currentWeekPulses, thisWeekLogs]);
+    return Object.entries(map).map(([projectId, mins]) => ({
+      projectId,
+      hours: (mins / 60).toFixed(1),
+      minutes: mins,
+      percentage: grandTotalMins > 0 ? Math.round((mins / grandTotalMins) * 100) : 0
+    })).sort((a, b) => b.minutes - a.minutes);
+  }, [filteredAnalyticsLogs]);
 
-  // Founder Creation Handlers
+  const taskTimeBreakdown = useMemo(() => {
+    const map = {};
+    let grandTotalMins = 0;
+
+    filteredAnalyticsLogs.forEach(log => {
+      const t = log.Task_Code || "GENERAL";
+      const val = Number(log.Task_Hours || 0);
+      const mins = val > 24 ? val : Math.round(val * 60);
+      map[t] = (map[t] || 0) + mins;
+      grandTotalMins += mins;
+    });
+
+    return Object.entries(map).map(([taskCode, mins]) => ({
+      taskCode,
+      hours: (mins / 60).toFixed(1),
+      minutes: mins,
+      percentage: grandTotalMins > 0 ? Math.round((mins / grandTotalMins) * 100) : 0
+    })).sort((a, b) => b.minutes - a.minutes);
+  }, [filteredAnalyticsLogs]);
+
+  const employeeWorkloadBuckets = useMemo(() => {
+    return employees.map(emp => {
+      const empEmail = (emp.Email || "").toLowerCase();
+      const empPulses = weeklyPulses.filter(p => (p.Emp_Email || "").toLowerCase() === empEmail && p.Week_Start_Date === currentMondayStr);
+      const activeTasks = empPulses.filter(p => Number(p.Auto_Task_Hours || 0) < 100);
+      const doneTasks = empPulses.filter(p => Number(p.Auto_Task_Hours || 0) >= 100);
+      const totalLoggedMins = empPulses.reduce((sum, p) => sum + Number(p.Auto_Learning_Hours || 0), 0);
+      const todayLogs = dailyLogs.filter(l => (l.Emp_Email || "").toLowerCase() === empEmail && l.Date === todayStr);
+
+      return {
+        ...emp,
+        totalTasks: empPulses.length,
+        activeCount: activeTasks.length,
+        doneCount: doneTasks.length,
+        totalLoggedMins,
+        totalLoggedHours: (totalLoggedMins / 60).toFixed(1),
+        activeTasksList: activeTasks,
+        doneTasksList: doneTasks,
+        todayLogsCount: todayLogs.length,
+        lastActiveProject: todayLogs.length > 0 ? todayLogs[todayLogs.length - 1].Project_ID : (empPulses.length > 0 ? empPulses[0].Project_ID : "Idle"),
+        lastActiveTask: todayLogs.length > 0 ? todayLogs[todayLogs.length - 1].Task_Code : "None"
+      };
+    });
+  }, [employees, weeklyPulses, dailyLogs, currentMondayStr, todayStr]);
+
+  const todayLiveLogs = useMemo(() => {
+    return dailyLogs.filter(l => l.Date === todayStr).reverse();
+  }, [dailyLogs, todayStr]);
+
   const handleAddEmployee = async (e) => {
     e.preventDefault();
-    const employeeEntry = {
+    const entry = {
       Emp_ID: "IE-" + ("00" + (employees.length + 1)).slice(-3),
       Name: newEmp.name,
       Email: newEmp.email.toLowerCase().trim(),
@@ -202,8 +240,8 @@ export default function App() {
       Status: "Active"
     };
 
-    setEmployees(prev => [...prev, employeeEntry]);
-    if (!activeEmployeeEmail) setActiveEmployeeEmail(employeeEntry.Email);
+    setEmployees(prev => [...prev, entry]);
+    if (!activeEmployeeEmail) setActiveEmployeeEmail(entry.Email);
     setShowEmpModal(false);
     showToast(`Employee ${newEmp.name} onboarded!`);
 
@@ -218,7 +256,7 @@ export default function App() {
 
   const handleAddProject = async (e) => {
     e.preventDefault();
-    const projectEntry = {
+    const entry = {
       Project_ID: newPrj.projectId.toUpperCase().trim(),
       Project_Name: newPrj.projectName,
       Priority_Level: newPrj.priority,
@@ -226,8 +264,7 @@ export default function App() {
       Status: "Active"
     };
 
-    setProjects(prev => [...prev, projectEntry]);
-    if (!selectedProject) setSelectedProject(projectEntry.Project_ID);
+    setProjects(prev => [...prev, entry]);
     setShowPrjModal(false);
     showToast(`Project ${newPrj.projectId} created!`);
 
@@ -242,14 +279,13 @@ export default function App() {
 
   const handleAddTask = async (e) => {
     e.preventDefault();
-    const taskEntry = {
+    const entry = {
       Task_Code: newTsk.taskCode.toUpperCase().trim(),
       Task_Title: newTsk.taskTitle,
       Category: newTsk.category
     };
 
-    setTasks(prev => [...prev, taskEntry]);
-    if (!selectedTaskCode) setSelectedTaskCode(taskEntry.Task_Code);
+    setTasks(prev => [...prev, entry]);
     setShowTskModal(false);
     showToast(`Task code ${newTsk.taskCode} added!`);
 
@@ -262,229 +298,120 @@ export default function App() {
     setNewTsk({ taskCode: "", taskTitle: "", category: "DEL" });
   };
 
-  const handleAddLearningModule = async (e) => {
+  const handleAddWorkboardItem = async (e) => {
     e.preventDefault();
-    const lrnEntry = {
-      Module_Code: newLrn.moduleCode.toUpperCase().trim(),
-      Domain: newLrn.domain,
-      Topic_Title: newLrn.topicTitle,
-      Target_Proficiency: newLrn.targetProficiency
+    if (!newItemTitle.trim()) { showToast("Enter a task title"); return; }
+    setIsAddingItem(true);
+
+    const targetEmail = viewRole === "founder" ? (assigneeEmail || activeEmployeeEmail) : activeEmployeeEmail;
+    const assignedBy = viewRole === "founder" ? "Founder" : "Self";
+
+    const newItem = {
+      Pulse_ID: "TSK-" + Date.now(),
+      Week_Start_Date: currentMondayStr,
+      Emp_Email: targetEmail,
+      Project_ID: newItemProject,
+      Task_Code: newItemTaskCode,
+      Monday_Commitment: newItemTitle,
+      Auto_Task_Hours: 0,
+      Auto_Learning_Hours: 0,
+      Friday_Outcome: assignedBy,
+      Status: "In Progress"
     };
 
-    setLearningModules(prev => [...prev, lrnEntry]);
-    setShowLrnModal(false);
-    showToast(`Learning module ${newLrn.moduleCode} added!`);
+    setWeeklyPulses(prev => [...prev, newItem]);
+    showToast(`Task added to ${assignedBy === "Founder" ? targetEmail : "your"} bucket!`);
+    setNewItemTitle("");
+    setShowAssignModal(false);
 
     try {
       fetch(APPS_SCRIPT_URL, {
         method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({ action: "createLearningModule", ...newLrn })
+        body: JSON.stringify({
+          action: "addWorkboardItem",
+          weekStartDate: currentMondayStr,
+          email: targetEmail,
+          projectId: newItemProject,
+          taskCode: newItemTaskCode,
+          commitmentTitle: newItemTitle,
+          progressPercent: 0,
+          loggedMinutes: 0,
+          assignedBy: assignedBy,
+          status: "In Progress"
+        })
       });
     } catch (err) { console.log(err); }
-    setNewLrn({ moduleCode: "", domain: "STEM Hardware", topicTitle: "", targetProficiency: "Intermediate" });
+    finally { setIsAddingItem(false); }
   };
 
-  // Add Item to Staged Batch Queue
-  const handleStageTask = () => {
-    if (!selectedProject || !selectedTaskCode) {
-      showToast("Select a project and task code first.");
-      return;
-    }
-    if (totalTaskMins === 0 && totalLrnMins === 0) {
-      showToast("Please select time using the slider.");
-      return;
-    }
-
-    const item = {
-      id: Date.now(),
-      projectId: selectedProject,
-      taskCode: selectedTaskCode,
-      taskMinutes: totalTaskMins,
-      learningModuleCode: selectedLearningModule,
-      learningMinutes: totalLrnMins,
-      notes: dailyNotes || "",
-      status: taskStatus
-    };
-
-    setStagedLogs(prev => [...prev, item]);
-    setDailyNotes("");
-    showToast("Task added to queue. Add another or hit Submit All.");
+  const handleOpenLogModal = (item) => {
+    setActiveLoggingItem(item);
+    setSessionProgress(Number(item.Auto_Task_Hours || 0));
+    setSessionSliderHours(1);
+    setSessionSliderMins(30);
+    setSessionNotes("");
   };
 
-  const removeStagedLog = (id) => {
-    setStagedLogs(prev => prev.filter(item => item.id !== id));
-  };
-
-  // Submit All Staged Logs or Single Entry
-  const handleBatchSubmit = async () => {
-    const logsToSend = stagedLogs.length > 0 ? stagedLogs : [{
-      id: Date.now(),
-      projectId: selectedProject,
-      taskCode: selectedTaskCode,
-      taskMinutes: totalTaskMins,
-      learningModuleCode: selectedLearningModule,
-      learningMinutes: totalLrnMins,
-      notes: dailyNotes || "",
-      status: taskStatus
-    }];
-
-    if (logsToSend[0].taskMinutes === 0 && logsToSend[0].learningMinutes === 0) {
-      showToast("Time cannot be 0. Adjust the sliders.");
-      return;
-    }
-
-    setIsSubmittingBatch(true);
-    let nextStreak = currentStreak + 1;
-
-    for (const log of logsToSend) {
-      const payload = {
-        action: "submitDailyLog",
-        email: activeEmployeeEmail,
-        projectId: log.projectId,
-        taskCode: log.taskCode,
-        taskHours: log.taskMinutes, // stores exact minutes
-        learningModuleCode: log.learningModuleCode || "None",
-        learningHours: log.learningMinutes,
-        status: log.status,
-        currentStreak: nextStreak - 1,
-        notes: log.notes
-      };
-
-      try {
-        fetch(APPS_SCRIPT_URL, {
-          method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify(payload)
-        });
-      } catch (err) { console.log(err); }
-
-      setDailyLogs(prev => [...prev, {
-        Log_ID: "LOG-" + log.id,
-        Date: new Date().toISOString().split('T')[0],
-        Emp_Email: activeEmployeeEmail,
-        Project_ID: log.projectId,
-        Task_Code: log.taskCode,
-        Task_Hours: log.taskMinutes,
-        Learning_Module_Code: log.learningModuleCode,
-        Learning_Hours: log.learningMinutes,
-        Status: log.status,
-        Streak_Count: nextStreak
-      }]);
-    }
-
-    setStagedLogs([]);
-    setDailyNotes("");
-    setIsSubmittingBatch(false);
-    showToast(`🚀 Successfully logged ${logsToSend.length} task(s)! Streak advanced.`);
-  };
-
-  // Monday Staged Commitments
-  const handleStageCommitment = () => {
-    if (!mondayGoalText.trim()) {
-      showToast("Enter a concrete deliverable goal statement.");
-      return;
-    }
-
-    const item = {
-      id: Date.now(),
-      projectId: mondayProject,
-      taskCode: mondayTaskCode,
-      commitment: mondayGoalText
-    };
-
-    setStagedCommitments(prev => [...prev, item]);
-    setMondayGoalText("");
-  };
-
-  const removeStagedCommitment = (id) => {
-    setStagedCommitments(prev => prev.filter(item => item.id !== id));
-  };
-
-  const handleMondaySubmitBatch = async () => {
-    const toSend = stagedCommitments.length > 0 ? stagedCommitments : (mondayGoalText.trim() ? [{
-      id: Date.now(),
-      projectId: mondayProject,
-      taskCode: mondayTaskCode,
-      commitment: mondayGoalText
-    }] : []);
-
-    if (toSend.length === 0) {
-      showToast("Please enter at least one Monday commitment.");
-      return;
-    }
-
-    setIsSubmittingMonday(true);
-
-    for (const c of toSend) {
-      const payload = {
-        action: "submitMondayCommitment",
-        email: activeEmployeeEmail,
-        projectId: c.projectId,
-        taskCode: c.taskCode,
-        weekStartDate: currentMondayStr,
-        commitment: c.commitment
-      };
-
-      try {
-        fetch(APPS_SCRIPT_URL, {
-          method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify(payload)
-        });
-      } catch (err) { console.log(err); }
-
-      setWeeklyPulses(prev => [...prev, {
-        Pulse_ID: "PLS-" + c.id,
-        Week_Start_Date: currentMondayStr,
-        Emp_Email: activeEmployeeEmail,
-        Project_ID: c.projectId,
-        Task_Code: c.taskCode,
-        Monday_Commitment: c.commitment,
-        Auto_Task_Hours: 0,
-        Auto_Learning_Hours: 0,
-        Status: "Committed"
-      }]);
-    }
-
-    setStagedCommitments([]);
-    setMondayGoalText("");
-    setIsSubmittingMonday(false);
-    showToast("🎯 Monday targets locked in! (+20 XP)");
-  };
-
-  // Friday Review Handler
-  const handleFridaySubmit = async (e) => {
+  const handleSaveTaskSession = async (e) => {
     e.preventDefault();
-    setIsSubmittingFriday(true);
+    if (!activeLoggingItem) return;
+    setIsSubmittingSession(true);
 
-    const payload = {
-      action: "submitFridayReview",
-      pulseId: currentWeekPulses.length > 0 ? currentWeekPulses[0].Pulse_ID : "",
-      email: activeEmployeeEmail,
-      weekStartDate: currentMondayStr,
-      projectId: currentWeekPulses.length > 0 ? currentWeekPulses[0].Project_ID : selectedProject,
-      commitment: currentWeekPulses.length > 0 ? currentWeekPulses[0].Monday_Commitment : "Weekly Targets",
-      autoTaskHours: autoTaskMinutesTotal,
-      autoLearningHours: autoLearningMinutesTotal,
-      fridayOutcome: fridayOutcome || `Completed ${weeklyReconciliation.percent}% of committed deliverables.`
-    };
+    const sessionMinutes = (sessionSliderHours * 60) + sessionSliderMins;
+    const nextStreak = currentStreak + 1;
+
+    setWeeklyPulses(prev => prev.map(p => {
+      if (p.Pulse_ID === activeLoggingItem.Pulse_ID) {
+        return {
+          ...p,
+          Auto_Task_Hours: sessionProgress,
+          Auto_Learning_Hours: Number(p.Auto_Learning_Hours || 0) + sessionMinutes,
+          Status: sessionProgress >= 100 ? "Completed" : "In Progress"
+        };
+      }
+      return p;
+    }));
+
+    setDailyLogs(prev => [...prev, {
+      Log_ID: "LOG-" + Date.now(),
+      Date: todayStr,
+      Emp_Email: activeEmployeeEmail,
+      Project_ID: activeLoggingItem.Project_ID,
+      Task_Code: activeLoggingItem.Task_Code,
+      Task_Hours: sessionMinutes,
+      Learning_Module_Code: sessionLearningModule,
+      Learning_Hours: 0,
+      Status: sessionProgress >= 100 ? "Done" : "In Progress",
+      Streak_Count: nextStreak
+    }]);
+
+    showToast(`Logged ${sessionMinutes}m on "${activeLoggingItem.Monday_Commitment}"!`);
+    setActiveLoggingItem(null);
 
     try {
       fetch(APPS_SCRIPT_URL, {
         method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          action: "logTaskSession",
+          pulseId: activeLoggingItem.Pulse_ID,
+          email: activeEmployeeEmail,
+          projectId: activeLoggingItem.Project_ID,
+          taskCode: activeLoggingItem.Task_Code,
+          taskMinutes: sessionMinutes,
+          learningModuleCode: sessionLearningModule,
+          learningMinutes: 0,
+          progressPercent: sessionProgress,
+          currentStreak: currentStreak,
+          status: sessionProgress >= 100 ? "Done" : "In Progress",
+          notes: sessionNotes
+        })
       });
-      showToast("🎉 Friday review auto-submitted! (+50 XP)");
-      setFridayOutcome("");
-      setTimeout(fetchSheetData, 1500);
-    } catch (err) {
-      console.log(err);
-    } finally {
-      setIsSubmittingFriday(false);
-    }
+    } catch (err) { console.log(err); }
+    finally { setIsSubmittingSession(false); }
   };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Top Navbar */}
       <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -495,7 +422,7 @@ export default function App() {
               <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">
                 IE Goal Tracker
               </span>
-              <span className="text-xs text-slate-500 block">Infinite Engineers • Precision Cadence</span>
+              <span className="text-xs text-slate-500 block">Executive Governance & Workload Hub</span>
             </div>
           </div>
 
@@ -507,14 +434,14 @@ export default function App() {
             <div className="flex items-center gap-2 bg-slate-800/80 p-1 rounded-lg border border-slate-700 text-xs">
               <button 
                 onClick={() => setViewRole("founder")}
-                className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition ${viewRole === "founder" ? "bg-blue-600 text-white font-medium" : "text-slate-400 hover:text-white"}`}
+                className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition ${viewRole === "founder" ? "bg-blue-600 text-white font-medium shadow-md shadow-blue-600/30" : "text-slate-400 hover:text-white"}`}
               >
                 <Shield className="h-3.5 w-3.5" /> Founder View
               </button>
 
               <button 
                 onClick={() => setViewRole("employee")}
-                className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition ${viewRole === "employee" ? "bg-indigo-600 text-white font-medium" : "text-slate-400 hover:text-white"}`}
+                className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition ${viewRole === "employee" ? "bg-indigo-600 text-white font-medium shadow-md shadow-indigo-600/30" : "text-slate-400 hover:text-white"}`}
               >
                 Employee Cockpit
               </button>
@@ -535,7 +462,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* Toast Alert */}
       {toastMessage && (
         <div className="max-w-md mx-auto mt-4 px-4 py-2.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-lg text-sm flex items-center gap-2 shadow-lg animate-pulse">
           <CheckCircle className="h-4 w-4 shrink-0 text-emerald-400" />
@@ -543,67 +469,265 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full">
         {viewRole === "founder" ? (
-          /* ================= FOUNDER CONTROL VIEW ================= */
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-bold tracking-tight">Founder Control Center</h1>
-                <p className="text-sm text-slate-400">Configure global projects, company tasks, learning modules, and audit team execution</p>
+                <h1 className="text-2xl font-bold tracking-tight">Executive Workload & Analytics Hub</h1>
+                <p className="text-sm text-slate-400">Inspect employee buckets, audit real-time activity, and analyze project capital allocation</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
+                <button onClick={() => setShowAssignModal(true)} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-medium flex items-center gap-1.5 shadow-lg shadow-indigo-600/20">
+                  <UserCheck className="h-3.5 w-3.5" /> + Assign to Bucket
+                </button>
                 <button onClick={() => setShowPrjModal(true)} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium border border-slate-700 flex items-center gap-1.5">
                   <FolderPlus className="h-3.5 w-3.5 text-blue-400" /> + Project
                 </button>
                 <button onClick={() => setShowTskModal(true)} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium border border-slate-700 flex items-center gap-1.5">
                   <ListPlus className="h-3.5 w-3.5 text-blue-400" /> + Task Code
                 </button>
-                <button onClick={() => setShowLrnModal(true)} className="px-3 py-2 bg-purple-900/40 hover:bg-purple-900/60 text-purple-200 rounded-xl text-xs font-medium border border-purple-700 flex items-center gap-1.5">
-                  <GraduationCap className="h-3.5 w-3.5 text-purple-400" /> + Learning Module
-                </button>
                 <button onClick={() => setShowEmpModal(true)} className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-medium flex items-center gap-1.5 shadow-lg shadow-blue-600/20">
-                  <UserPlus className="h-3.5 w-3.5" /> + Onboard Employee
+                  <UserPlus className="h-3.5 w-3.5" /> + Onboard
                 </button>
               </div>
             </div>
 
-            {/* Quick Metrics */}
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-              <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
-                <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Active Team</span>
-                <div className="text-2xl font-bold mt-1 text-white">{employees.length} Members</div>
-                <span className="text-xs text-slate-500 mt-1 block">Live Onboarded</span>
-              </div>
-              <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
-                <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Active Projects</span>
-                <div className="text-2xl font-bold mt-1 text-blue-400">{projects.length} Initiatives</div>
-                <span className="text-xs text-slate-500 mt-1 block">Reusable pairing</span>
-              </div>
-              <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
-                <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Master Task Codes</span>
-                <div className="text-2xl font-bold mt-1 text-slate-100">{tasks.length} Codes</div>
-                <span className="text-xs text-slate-500 mt-1 block">Cross-cutting library</span>
-              </div>
-              <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
-                <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Weekly Pulses</span>
-                <div className="text-2xl font-bold mt-1 text-purple-400">{weeklyPulses.length} Pulses</div>
-                <span className="text-xs text-slate-500 mt-1 block">Monday/Friday matrix</span>
-              </div>
+            <div className="flex border-b border-slate-800 text-sm gap-6 overflow-x-auto">
+              <button onClick={() => setFounderTab("workload")} className={`pb-3 font-medium transition flex items-center gap-1.5 shrink-0 ${founderTab === "workload" ? "text-blue-400 border-b-2 border-blue-500" : "text-slate-400 hover:text-white"}`}>
+                <Users className="h-4 w-4" /> Team Workload Buckets
+              </button>
+              <button onClick={() => setFounderTab("analytics")} className={`pb-3 font-medium transition flex items-center gap-1.5 shrink-0 ${founderTab === "analytics" ? "text-indigo-400 border-b-2 border-indigo-500" : "text-slate-400 hover:text-white"}`}>
+                <PieChart className="h-4 w-4" /> Project & Task Time Allocation
+              </button>
+              <button onClick={() => setFounderTab("live")} className={`pb-3 font-medium transition flex items-center gap-1.5 shrink-0 ${founderTab === "live" ? "text-emerald-400 border-b-2 border-emerald-500" : "text-slate-400 hover:text-white"}`}>
+                <Activity className="h-4 w-4" /> Today's Live Execution Feed ({todayLiveLogs.length})
+              </button>
+              <button onClick={() => setFounderTab("team")} className={`pb-3 font-medium transition flex items-center gap-1.5 shrink-0 ${founderTab === "team" ? "text-purple-400 border-b-2 border-purple-500" : "text-slate-400 hover:text-white"}`}>
+                <BookOpen className="h-4 w-4" /> Roster, Levels & KRAs
+              </button>
             </div>
 
-            {/* Live Team Roster with Level & R&R */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl overflow-hidden">
-              <div className="px-5 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900">
-                <h3 className="font-semibold text-sm text-slate-200">Team Roster, Autonomy Levels & R&R</h3>
-                <span className="text-xs text-slate-400">Synced with Sheet</span>
-              </div>
-              {employees.length === 0 ? (
-                <div className="p-8 text-center text-slate-500 text-sm">
-                  No team members onboarded yet. Click "+ Onboard Employee" to begin.
+            {founderTab === "workload" && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {employeeWorkloadBuckets.map(b => (
+                    <div key={b.Email} className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between hover:border-slate-700 transition">
+                      <div>
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <h3 className="font-bold text-base text-white">{b.Name}</h3>
+                            <span className="text-xs text-slate-400">{b.Role_Title}</span>
+                          </div>
+                          <span className="px-2 py-0.5 rounded text-xs bg-blue-500/10 text-blue-300 font-mono border border-blue-500/20">
+                            {b.Level}
+                          </span>
+                        </div>
+
+                        <div className="mb-4 p-2.5 bg-slate-950/80 rounded-xl border border-slate-800/80 flex items-center justify-between text-xs">
+                          <span className="text-slate-400 flex items-center gap-1.5">
+                            <span className={`h-2 w-2 rounded-full ${b.todayLogsCount > 0 ? "bg-emerald-400 animate-pulse" : "bg-slate-600"}`} />
+                            Current / Today:
+                          </span>
+                          <span className="font-mono font-medium text-emerald-300">
+                            {b.lastActiveProject} • {b.lastActiveTask}
+                          </span>
+                        </div>
+
+                        <div className="space-y-2 mb-4">
+                          <div className="flex justify-between text-xs text-slate-400 font-medium">
+                            <span>Active Bucket ({b.activeCount} tasks)</span>
+                            <span className="text-amber-400 font-mono">{b.totalLoggedHours}h logged this week</span>
+                          </div>
+
+                          <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                            {b.activeTasksList.length === 0 && b.doneTasksList.length === 0 && (
+                              <p className="text-[11px] text-slate-500 italic">No tasks in bucket this week.</p>
+                            )}
+
+                            {b.activeTasksList.map(item => (
+                              <div key={item.Pulse_ID} className="p-2 rounded-lg bg-slate-950 border border-slate-800 text-xs">
+                                <div className="flex justify-between text-[11px] mb-1">
+                                  <span className="font-mono text-blue-400">[{item.Project_ID} • {item.Task_Code}]</span>
+                                  <span className="font-mono text-emerald-400 font-bold">{item.Auto_Task_Hours || 0}%</span>
+                                </div>
+                                <div className="text-slate-200 text-xs truncate">{item.Monday_Commitment}</div>
+                              </div>
+                            ))}
+
+                            {b.doneTasksList.map(item => (
+                              <div key={item.Pulse_ID} className="p-2 rounded-lg bg-emerald-950/20 border border-emerald-500/20 text-xs">
+                                <div className="flex justify-between text-[11px] mb-1">
+                                  <span className="font-mono text-emerald-300 line-through">[{item.Project_ID} • {item.Task_Code}]</span>
+                                  <span className="font-mono text-emerald-400 font-bold">100% ✓</span>
+                                </div>
+                                <div className="text-slate-400 text-xs line-through truncate">{item.Monday_Commitment}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setActiveEmployeeEmail(b.Email);
+                          setViewRole("employee");
+                        }}
+                        className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition border border-slate-700"
+                      >
+                        Inspect Full Cockpit <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ) : (
+              </div>
+            )}
+
+            {founderTab === "analytics" && (
+              <div className="space-y-6">
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400 font-medium">Filter Member:</span>
+                    <select
+                      value={selectedFounderEmp}
+                      onChange={e => setSelectedFounderEmp(e.target.value)}
+                      className="bg-slate-950 border border-slate-800 text-slate-200 text-xs px-3 py-1.5 rounded-lg"
+                    >
+                      <option value="ALL">Entire Company (All Members)</option>
+                      {employees.map(e => <option key={e.Email} value={e.Email}>{e.Name}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                    <button 
+                      onClick={() => setAnalyticsTimeframe("WEEK")}
+                      className={`px-3 py-1 rounded-lg transition ${analyticsTimeframe === "WEEK" ? "bg-blue-600 text-white font-medium" : "text-slate-400 hover:text-white"}`}
+                    >
+                      This Week
+                    </button>
+                    <button 
+                      onClick={() => setAnalyticsTimeframe("MONTH")}
+                      className={`px-3 py-1 rounded-lg transition ${analyticsTimeframe === "MONTH" ? "bg-blue-600 text-white font-medium" : "text-slate-400 hover:text-white"}`}
+                    >
+                      This Month
+                    </button>
+                    <button 
+                      onClick={() => setAnalyticsTimeframe("ALL")}
+                      className={`px-3 py-1 rounded-lg transition ${analyticsTimeframe === "ALL" ? "bg-blue-600 text-white font-medium" : "text-slate-400 hover:text-white"}`}
+                    >
+                      All-Time / Yearly
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
+                    <div className="flex justify-between items-center mb-4">
+                      <div>
+                        <h3 className="font-bold text-sm text-slate-100 flex items-center gap-2">
+                          <FolderPlus className="h-4 w-4 text-blue-400" /> Time Spent by Project
+                        </h3>
+                        <span className="text-xs text-slate-400">Use to budget operational costs and resource distribution</span>
+                      </div>
+                    </div>
+
+                    {projectTimeBreakdown.length === 0 ? (
+                      <p className="text-xs text-slate-500 py-6 text-center">No time logged for this filter window.</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {projectTimeBreakdown.map(p => (
+                          <div key={p.projectId} className="space-y-1.5">
+                            <div className="flex justify-between text-xs">
+                              <span className="font-mono text-blue-400 font-semibold">{p.projectId}</span>
+                              <span className="font-mono text-slate-200">{p.hours} hrs ({p.minutes}m) • <span className="text-emerald-400 font-bold">{p.percentage}%</span></span>
+                            </div>
+                            <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                              <div className="bg-gradient-to-r from-blue-500 to-indigo-500 h-full" style={{ width: `${p.percentage}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
+                    <div className="flex justify-between items-center mb-4">
+                      <div>
+                        <h3 className="font-bold text-sm text-slate-100 flex items-center gap-2">
+                          <ListPlus className="h-4 w-4 text-emerald-400" /> Time Spent by Functional Task Code
+                        </h3>
+                        <span className="text-xs text-slate-400">Identifies high-friction operational vs delivery bottlenecks</span>
+                      </div>
+                    </div>
+
+                    {taskTimeBreakdown.length === 0 ? (
+                      <p className="text-xs text-slate-500 py-6 text-center">No time logged for this filter window.</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {taskTimeBreakdown.map(t => (
+                          <div key={t.taskCode} className="space-y-1.5">
+                            <div className="flex justify-between text-xs">
+                              <span className="font-mono text-emerald-400 font-semibold">{t.taskCode}</span>
+                              <span className="font-mono text-slate-200">{t.hours} hrs ({t.minutes}m) • <span className="text-emerald-400 font-bold">{t.percentage}%</span></span>
+                            </div>
+                            <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                              <div className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full" style={{ width: `${t.percentage}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {founderTab === "live" && (
+              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900">
+                  <h3 className="font-semibold text-sm text-slate-200 flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-emerald-400" /> Live Daily Execution Stream (Today: {todayStr})
+                  </h3>
+                  <span className="text-xs text-slate-400">Real-time check-in log</span>
+                </div>
+                {todayLiveLogs.length === 0 ? (
+                  <div className="p-8 text-center text-slate-500 text-sm">
+                    No sessions logged yet today. Team members log time as they progress through their task cards.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-800/60">
+                    {todayLiveLogs.map(log => (
+                      <div key={log.Log_ID} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-800/40 transition">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm text-slate-100">{log.Emp_Email}</span>
+                            <span className="text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
+                              {log.Project_ID} • {log.Task_Code}
+                            </span>
+                            <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">
+                              {log.Status}
+                            </span>
+                          </div>
+                          {log.Notes && <p className="text-xs text-slate-300 mt-1 italic">"{log.Notes}"</p>}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-sm font-bold font-mono text-amber-400">
+                            {log.Task_Hours} mins ({(Number(log.Task_Hours || 0)/60).toFixed(1)}h)
+                          </span>
+                          <span className="text-[11px] text-slate-500 block">Streak: 🔥 {log.Streak_Count || 1} Days</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {founderTab === "team" && (
+              <div className="bg-slate-900/80 border border-slate-800 rounded-xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900">
+                  <h3 className="font-semibold text-sm text-slate-200">Master Team Directory & Permanent KRAs</h3>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead className="bg-slate-950/60 text-slate-400 text-xs border-b border-slate-800 uppercase tracking-wider">
@@ -611,7 +735,7 @@ export default function App() {
                         <th className="px-5 py-3">Member & Email</th>
                         <th className="px-5 py-3">Role</th>
                         <th className="px-5 py-3">Autonomy Level</th>
-                        <th className="px-5 py-3">Core Baseline R&R</th>
+                        <th className="px-5 py-3">Baseline KRAs</th>
                         <th className="px-5 py-3 text-right">Cockpit</th>
                       </tr>
                     </thead>
@@ -645,57 +769,11 @@ export default function App() {
                     </tbody>
                   </table>
                 </div>
-              )}
-            </div>
-
-            {/* Weekly Cadence Rollup with Real-time Progress Bar */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl overflow-hidden">
-              <div className="px-5 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900">
-                <h3 className="font-semibold text-sm text-slate-200">Execution Cadence Rollup (Week of {currentMondayStr})</h3>
-                <span className="text-xs text-slate-400">Real-time Goal Fulfillment</span>
               </div>
-              {weeklyPulses.length === 0 ? (
-                <div className="p-8 text-center text-slate-500 text-sm">
-                  No commitments logged this week yet.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-950/60 text-slate-400 text-xs border-b border-slate-800 uppercase tracking-wider">
-                      <tr>
-                        <th className="px-5 py-3">Member</th>
-                        <th className="px-5 py-3">Committed Goal</th>
-                        <th className="px-5 py-3">Project & Task</th>
-                        <th className="px-5 py-3">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60">
-                      {weeklyPulses.map(pulse => (
-                        <tr key={pulse.Pulse_ID} className="hover:bg-slate-800/40 transition">
-                          <td className="px-5 py-3.5 font-medium text-slate-200">{pulse.Emp_Email}</td>
-                          <td className="px-5 py-3.5 text-xs text-slate-300 max-w-sm">{pulse.Monday_Commitment}</td>
-                          <td className="px-5 py-3.5">
-                            <span className="text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
-                              {pulse.Project_ID} {pulse.Task_Code ? `• ${pulse.Task_Code}` : ''}
-                            </span>
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${pulse.Status === "Completed" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" : "bg-amber-500/10 text-amber-400 border border-amber-500/30"}`}>
-                              {pulse.Status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         ) : (
-          /* ================= EMPLOYEE COCKPIT VIEW ================= */
           <div className="space-y-6">
-            {/* Header Profile Card */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-blue-600 flex items-center justify-center text-xl font-bold shadow-lg shadow-blue-500/20">
@@ -730,558 +808,210 @@ export default function App() {
               </div>
             </div>
 
-            {/* Nav Tabs */}
             <div className="flex border-b border-slate-800 text-sm gap-6 overflow-x-auto">
-              <button onClick={() => setActiveTab("daily")} className={`pb-3 font-medium transition shrink-0 ${activeTab === "daily" ? "text-blue-400 border-b-2 border-blue-500" : "text-slate-400 hover:text-white"}`}>
-                Daily Precision Logger
+              <button onClick={() => setEmployeeTab("workboard")} className={`pb-3 font-medium transition shrink-0 flex items-center gap-1.5 ${employeeTab === "workboard" ? "text-blue-400 border-b-2 border-blue-500" : "text-slate-400 hover:text-white"}`}>
+                <CalendarCheck className="h-4 w-4" /> My Weekly Workboard ({currentWorkboard.length})
               </button>
-              <button onClick={() => setActiveTab("weekly")} className={`pb-3 font-medium transition shrink-0 flex items-center gap-1.5 ${activeTab === "weekly" ? "text-indigo-400 border-b-2 border-indigo-500" : "text-slate-400 hover:text-white"}`}>
-                <CalendarCheck className="h-4 w-4" /> Weekly Cadence (Monday & Friday)
+              <button onClick={() => setEmployeeTab("levels")} className={`pb-3 font-medium transition shrink-0 flex items-center gap-1.5 ${employeeTab === "levels" ? "text-amber-400 border-b-2 border-amber-500" : "text-slate-400 hover:text-white"}`}>
+                <BarChart3 className="h-4 w-4" /> L1–L4 Autonomy
               </button>
-              <button onClick={() => setActiveTab("levels")} className={`pb-3 font-medium transition shrink-0 flex items-center gap-1.5 ${activeTab === "levels" ? "text-amber-400 border-b-2 border-amber-500" : "text-slate-400 hover:text-white"}`}>
-                <BarChart3 className="h-4 w-4" /> L1–L4 Autonomy Matrix
-              </button>
-              <button onClick={() => setActiveTab("catalog")} className={`pb-3 font-medium transition shrink-0 flex items-center gap-1.5 ${activeTab === "catalog" ? "text-emerald-400 border-b-2 border-emerald-500" : "text-slate-400 hover:text-white"}`}>
+              <button onClick={() => setEmployeeTab("catalog")} className={`pb-3 font-medium transition shrink-0 flex items-center gap-1.5 ${employeeTab === "catalog" ? "text-emerald-400 border-b-2 border-emerald-500" : "text-slate-400 hover:text-white"}`}>
                 <LayoutGrid className="h-4 w-4" /> Company Catalog
               </button>
-              <button onClick={() => setActiveTab("rnr")} className={`pb-3 font-medium transition shrink-0 flex items-center gap-1.5 ${activeTab === "rnr" ? "text-purple-400 border-b-2 border-purple-500" : "text-slate-400 hover:text-white"}`}>
+              <button onClick={() => setEmployeeTab("rnr")} className={`pb-3 font-medium transition shrink-0 flex items-center gap-1.5 ${employeeTab === "rnr" ? "text-purple-400 border-b-2 border-purple-500" : "text-slate-400 hover:text-white"}`}>
                 <BookOpen className="h-4 w-4" /> My R&R
               </button>
             </div>
 
-            {/* TAB 1: DAILY DUAL SLIDER PRECISION LOGGER (LOG-AS-YOU-GO OR MULTI-TASK QUEUE) */}
-            {activeTab === "daily" && (
+            {employeeTab === "workboard" && (
               <div className="space-y-6">
-                <div className="bg-slate-900/80 border border-blue-500/30 rounded-2xl p-5 shadow-xl shadow-blue-950/20">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-ping" />
-                      <h3 className="font-semibold text-base text-slate-100">Log Daily Tasks & Learning (Sliders)</h3>
-                    </div>
-                    <span className="text-xs text-slate-400">Log instantly or stack multiple tasks into the queue below</span>
-                  </div>
-
-                  {projects.length === 0 || tasks.length === 0 ? (
-                    <div className="p-6 bg-slate-950/60 rounded-xl text-center text-sm text-slate-400 border border-slate-800">
-                      Switch to <strong>Founder View</strong> to create at least one Project and one Global Task Code first.
-                    </div>
-                  ) : (
-                    <div className="space-y-5">
-                      {/* Section 1: Project Execution Pairing */}
-                      <div className="p-4 bg-slate-950/60 rounded-xl border border-slate-800/80 space-y-4">
-                        <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider block">1. Project Execution Track</span>
-                        
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                            <label className="text-xs text-slate-400 block mb-1">Target Project</label>
-                            <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
-                              {projects.map(p => <option key={p.Project_ID} value={p.Project_ID}>[{p.Project_ID}] {p.Project_Name}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-xs text-slate-400 block mb-1">Reusable Task Code</label>
-                            <select value={selectedTaskCode} onChange={e => setSelectedTaskCode(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
-                              {tasks.map(t => <option key={t.Task_Code} value={t.Task_Code}>[{t.Task_Code}] {t.Task_Title} ({t.Category})</option>)}
-                            </select>
-                          </div>
-                        </div>
-
-                        {/* Interactive Dual Sliders for Task Time */}
-                        <div className="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800 space-y-3">
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="text-slate-300 font-medium flex items-center gap-1.5">
-                              <Clock className="h-3.5 w-3.5 text-blue-400" /> Task Time:
-                            </span>
-                            <span className="px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-mono font-bold text-xs border border-blue-500/30">
-                              {taskSliderHours}h {taskSliderMins}m ({totalTaskMins} mins / {(totalTaskMins/60).toFixed(2)} hrs)
-                            </span>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                            <div>
-                              <div className="flex justify-between text-[11px] text-slate-400 mb-1">
-                                <span>Hours</span>
-                                <span className="font-semibold text-white">{taskSliderHours} hrs</span>
-                              </div>
-                              <input 
-                                type="range" min="0" max="10" step="1" 
-                                value={taskSliderHours} 
-                                onChange={e => setTaskSliderHours(Number(e.target.value))}
-                                className="w-full accent-blue-500 cursor-pointer" 
-                              />
-                            </div>
-                            <div>
-                              <div className="flex justify-between text-[11px] text-slate-400 mb-1">
-                                <span>Minutes</span>
-                                <span className="font-semibold text-white">{taskSliderMins} mins</span>
-                              </div>
-                              <input 
-                                type="range" min="0" max="45" step="15" 
-                                value={taskSliderMins} 
-                                onChange={e => setTaskSliderMins(Number(e.target.value))}
-                                className="w-full accent-blue-500 cursor-pointer" 
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Section 2: Deliberate Learning Track */}
-                      <div className="p-4 bg-slate-950/60 rounded-xl border border-slate-800/80 space-y-4">
-                        <span className="text-xs font-semibold text-purple-400 uppercase tracking-wider block">2. Deliberate Learning Track (Multi-Module Compatible)</span>
-                        
-                        <div>
-                          <label className="text-xs text-slate-400 block mb-1">Learning Module</label>
-                          <select value={selectedLearningModule} onChange={e => setSelectedLearningModule(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
-                            <option value="None">None for this entry</option>
-                            {learningModules.map(m => <option key={m.Module_Code} value={m.Module_Code}>[{m.Module_Code}] {m.Topic_Title} ({m.Domain})</option>)}
-                          </select>
-                        </div>
-
-                        {selectedLearningModule !== "None" && (
-                          <div className="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800 space-y-3">
-                            <div className="flex justify-between items-center text-xs">
-                              <span className="text-slate-300 font-medium flex items-center gap-1.5">
-                                <GraduationCap className="h-3.5 w-3.5 text-purple-400" /> Learning Time:
-                              </span>
-                              <span className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-mono font-bold text-xs border border-purple-500/30">
-                                {lrnSliderHours}h {lrnSliderMins}m ({totalLrnMins} mins)
-                              </span>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                              <div>
-                                <div className="flex justify-between text-[11px] text-slate-400 mb-1">
-                                  <span>Hours</span>
-                                  <span className="font-semibold text-white">{lrnSliderHours} hrs</span>
-                                </div>
-                                <input 
-                                  type="range" min="0" max="4" step="1" 
-                                  value={lrnSliderHours} 
-                                  onChange={e => setLrnSliderHours(Number(e.target.value))}
-                                  className="w-full accent-purple-500 cursor-pointer" 
-                                />
-                              </div>
-                              <div>
-                                <div className="flex justify-between text-[11px] text-slate-400 mb-1">
-                                  <span>Minutes</span>
-                                  <span className="font-semibold text-white">{lrnSliderMins} mins</span>
-                                </div>
-                                <input 
-                                  type="range" min="0" max="45" step="15" 
-                                  value={lrnSliderMins} 
-                                  onChange={e => setLrnSliderMins(Number(e.target.value))}
-                                  className="w-full accent-purple-500 cursor-pointer" 
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Notes & Status */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="sm:col-span-2">
-                          <label className="text-xs text-slate-400 block mb-1">Context Notes / Proof Link (Optional)</label>
-                          <input type="text" value={dailyNotes} onChange={e => setDailyNotes(e.target.value)} placeholder="e.g. Conducted robotics session with 40 students & calibrated sensors" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200" />
-                        </div>
-                        <div>
-                          <label className="text-xs text-slate-400 block mb-1">Status</label>
-                          <select value={taskStatus} onChange={e => setTaskStatus(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200">
-                            <option value="Done">Done (Builds Streak)</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Blocked">Blocked</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Action Buttons: Add to Queue vs Log Immediately */}
-                      <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                        <button 
-                          type="button" 
-                          onClick={handleStageTask} 
-                          className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 border border-slate-700 transition"
-                        >
-                          <Plus className="h-4 w-4 text-emerald-400" /> + Add to Today's Multi-Task Queue
-                        </button>
-
-                        <button 
-                          type="button" 
-                          disabled={isSubmittingBatch}
-                          onClick={handleBatchSubmit} 
-                          className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 text-white font-medium py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 transition disabled:opacity-50 shadow-lg shadow-blue-500/20"
-                        >
-                          <Send className="h-4 w-4" /> {isSubmittingBatch ? "Logging..." : (stagedLogs.length > 0 ? `Submit All (${stagedLogs.length}) Staged Tasks (+35 XP)` : "Log This Single Task (+35 XP)")}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Staged Multi-Task Queue List */}
-                {stagedLogs.length > 0 && (
-                  <div className="bg-slate-900/90 border border-emerald-500/30 rounded-2xl p-5 shadow-xl">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold text-sm text-emerald-300 flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4" /> Queued for Submission Today ({stagedLogs.length} Activities)
-                      </h4>
-                      <span className="text-xs text-slate-400 font-mono">
-                        Total Queued: {stagedLogs.reduce((acc, c) => acc + c.taskMinutes, 0)} mins
+                <div className="bg-slate-900/80 border border-blue-500/30 rounded-2xl p-5 shadow-xl">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                    <div>
+                      <h3 className="font-semibold text-base text-slate-100 flex items-center gap-2">
+                        <Zap className="h-5 w-5 text-blue-400" /> Current Week Goal Completion
+                      </h3>
+                      <span className="text-xs text-slate-400">
+                        {collectionMetrics.completedCount} of {currentWorkboard.length} tasks completed • Total Logged: {collectionMetrics.totalMinutes} mins ({(collectionMetrics.totalMinutes/60).toFixed(1)} hrs)
                       </span>
                     </div>
-
-                    <div className="divide-y divide-slate-800/80">
-                      {stagedLogs.map(item => (
-                        <div key={item.id} className="py-2.5 flex justify-between items-center text-xs">
-                          <div>
-                            <span className="font-mono text-blue-400 font-semibold">[{item.projectId} • {item.taskCode}]</span>{" "}
-                            <span className="text-slate-200">{item.taskMinutes} mins</span>
-                            {item.learningModuleCode !== "None" && (
-                              <span className="text-purple-400 ml-2 font-mono">• Lrn: [{item.learningModuleCode}] {item.learningMinutes}m</span>
-                            )}
-                            {item.notes && <span className="text-slate-400 block mt-0.5 italic">"{item.notes}"</span>}
-                          </div>
-                          <button onClick={() => removeStagedLog(item.id)} className="text-rose-400 hover:text-rose-300 p-1">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      ))}
+                    <div className="text-right">
+                      <span className="text-2xl font-bold font-mono text-emerald-400">{collectionMetrics.percent}%</span>
+                      <span className="text-xs text-slate-500 block">Overall Progress</span>
                     </div>
                   </div>
-                )}
-              </div>
-            )}
 
-            {/* TAB 2: WEEKLY CADENCE (MONDAY STRUCTURED MATRIX & FRIDAY AUTO-RECONCILIATION) */}
-            {activeTab === "weekly" && (
-              <div className="space-y-6">
-                {/* 1. MONDAY COMMITMENT MATRIX */}
-                <div className="bg-slate-900/80 border border-blue-500/30 rounded-2xl p-5 shadow-xl">
+                  <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800">
+                    <div className="bg-gradient-to-r from-blue-500 to-emerald-400 h-full transition-all duration-500" style={{ width: `${collectionMetrics.percent}%` }} />
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <Zap className="h-5 w-5 text-blue-400" />
-                      <h3 className="font-semibold text-base text-slate-100">Step 1: Monday Structured Target Matrix</h3>
-                    </div>
-                    <span className="text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 font-mono">Week of {currentMondayStr}</span>
+                    <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Plus className="h-3.5 w-3.5 text-blue-400" /> Add Task to My Bucket
+                    </span>
+                    <span className="text-[11px] text-slate-500">Add on Monday morning or ad-hoc during the week</span>
                   </div>
 
-                  <p className="text-xs text-slate-400 mb-4">
-                    Commit your tangible, high-priority deliverables for this week. You can add multiple commitments across projects.
-                  </p>
-
-                  {/* Add Commitment Line Item */}
-                  <div className="p-4 bg-slate-950/60 rounded-xl border border-slate-800 space-y-3 mb-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <form onSubmit={handleAddWorkboardItem} className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
-                        <label className="text-xs text-slate-400 block mb-1">Target Project</label>
-                        <select value={mondayProject} onChange={e => setMondayProject(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
+                        <label className="text-xs text-slate-400 block mb-1">Project</label>
+                        <select value={newItemProject} onChange={e => setNewItemProject(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200">
                           {projects.map(p => <option key={p.Project_ID} value={p.Project_ID}>[{p.Project_ID}] {p.Project_Name}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="text-xs text-slate-400 block mb-1">Expected Primary Task Code</label>
-                        <select value={mondayTaskCode} onChange={e => setMondayTaskCode(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
+                        <label className="text-xs text-slate-400 block mb-1">Reusable Task Code</label>
+                        <select value={newItemTaskCode} onChange={e => setNewItemTaskCode(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200">
                           {tasks.map(t => <option key={t.Task_Code} value={t.Task_Code}>[{t.Task_Code}] {t.Task_Title}</option>)}
                         </select>
                       </div>
-                    </div>
-
-                    <div>
-                      <label className="text-xs text-slate-400 block mb-1">Deliverable Commitment Statement</label>
-                      <input 
-                        type="text" 
-                        value={mondayGoalText} 
-                        onChange={e => setMondayGoalText(e.target.value)} 
-                        placeholder="e.g. Conduct hands-on workshops in 4 partner schools & calibrate 20 lab sensors" 
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200" 
-                      />
-                    </div>
-
-                    <div className="flex gap-2 pt-1">
-                      <button 
-                        type="button" 
-                        onClick={handleStageCommitment}
-                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 flex items-center gap-1.5"
-                      >
-                        <Plus className="h-3.5 w-3.5 text-blue-400" /> + Add Another Goal
-                      </button>
-                      <button 
-                        type="button" 
-                        disabled={isSubmittingMonday}
-                        onClick={handleMondaySubmitBatch}
-                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-lg shadow-lg flex items-center gap-1.5"
-                      >
-                        <CheckSquare className="h-3.5 w-3.5" /> {isSubmittingMonday ? "Locking..." : "Lock All Monday Commitments (+20 XP)"}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Staged Goals Queue */}
-                  {stagedCommitments.length > 0 && (
-                    <div className="mb-4 bg-slate-950/80 p-3 rounded-xl border border-blue-500/30">
-                      <span className="text-xs font-semibold text-blue-300 block mb-2">Queued Monday Goals (Hit 'Lock All' to Save):</span>
-                      <div className="space-y-1.5">
-                        {stagedCommitments.map(item => (
-                          <div key={item.id} className="flex justify-between items-center text-xs bg-slate-900 p-2 rounded border border-slate-800">
-                            <div>
-                              <span className="font-mono text-blue-400 font-medium">[{item.projectId} • {item.taskCode}]</span>{" "}
-                              <span className="text-slate-200">{item.commitment}</span>
-                            </div>
-                            <button onClick={() => removeStagedCommitment(item.id)} className="text-rose-400 hover:text-rose-300">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ))}
+                      <div>
+                        <label className="text-xs text-slate-400 block mb-1">Deliverable Statement</label>
+                        <input 
+                          type="text" 
+                          required
+                          value={newItemTitle} 
+                          onChange={e => setNewItemTitle(e.target.value)} 
+                          placeholder="e.g. Conduct hands-on STEM sessions in 4 schools" 
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200" 
+                        />
                       </div>
                     </div>
-                  )}
-
-                  {/* Active Committed Goals from Google Sheet */}
-                  {currentWeekPulses.length > 0 && (
-                    <div className="space-y-2">
-                      <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider block">Locked Weekly Targets:</span>
-                      <div className="space-y-2">
-                        {currentWeekPulses.map(pulse => (
-                          <div key={pulse.Pulse_ID} className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-xs flex justify-between items-center">
-                            <div>
-                              <span className="font-mono text-blue-400 font-semibold">[{pulse.Project_ID} {pulse.Task_Code ? `• ${pulse.Task_Code}` : ''}]</span>{" "}
-                              <span className="text-slate-200 font-medium">{pulse.Monday_Commitment}</span>
-                            </div>
-                            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-medium">
-                              Locked
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* 2. FRIDAY AUTO-RECONCILIATION & PROGRESS ENGINE */}
-                <div className="bg-slate-900/80 border border-indigo-500/30 rounded-2xl p-5 shadow-xl">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-5 w-5 text-emerald-400" />
-                      <h3 className="font-semibold text-base text-slate-100">Step 2: Friday Auto-Reconciliation & Review</h3>
-                    </div>
-                    <span className="text-xs px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 font-mono">Friday 5 PM Review</span>
-                  </div>
-
-                  {/* Goal Completion Progress Bar */}
-                  <div className="p-4 bg-slate-950/70 rounded-xl border border-slate-800 mb-4 space-y-2">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-medium text-slate-300">Committed Goals Fulfilled:</span>
-                      <span className="font-bold text-emerald-400 font-mono text-sm">{weeklyReconciliation.percent}% ({weeklyReconciliation.completed}/{weeklyReconciliation.total} Goals)</span>
-                    </div>
-
-                    <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
-                      <div 
-                        className="bg-gradient-to-r from-blue-500 to-emerald-400 h-full transition-all duration-500" 
-                        style={{ width: `${weeklyReconciliation.percent}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Reconciled Line Items Comparison */}
-                  {weeklyReconciliation.items.length > 0 && (
-                    <div className="space-y-2 mb-4">
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Goal vs. Actual Work Audit:</span>
-                      <div className="divide-y divide-slate-800/80 bg-slate-950/60 rounded-xl border border-slate-800 p-2">
-                        {weeklyReconciliation.items.map(item => (
-                          <div key={item.pulseId} className="py-2 px-2 flex justify-between items-center text-xs">
-                            <div>
-                              <div className="text-slate-200 font-medium">{item.commitment}</div>
-                              <span className="font-mono text-slate-500">[{item.project} • {item.taskCode}]</span>
-                            </div>
-                            <div className="text-right">
-                              {item.isCompleted ? (
-                                <span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
-                                  <CheckCircle2 className="h-3.5 w-3.5" /> {item.entriesCount} Logs ({item.loggedMinutes}m)
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-amber-400 font-medium">
-                                  <AlertCircle className="h-3.5 w-3.5" /> 0 Logs this week
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Aggregated Hours Summary */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                    <div className="p-3.5 bg-slate-950/60 rounded-xl border border-slate-800">
-                      <span className="text-xs text-slate-400 uppercase tracking-wider block mb-1">Project Execution Total:</span>
-                      <div className="text-xl font-bold text-blue-400">{autoTaskMinutesTotal} Mins ({(autoTaskMinutesTotal / 60).toFixed(1)} hrs)</div>
-                      <span className="text-xs text-slate-500 block mt-0.5">Calculated from Monday through Friday logs</span>
-                    </div>
-
-                    <div className="p-3.5 bg-slate-950/60 rounded-xl border border-slate-800">
-                      <span className="text-xs text-slate-400 uppercase tracking-wider block mb-1">Deliberate Learning Total:</span>
-                      <div className="text-xl font-bold text-purple-400">{autoLearningMinutesTotal} Mins ({(autoLearningMinutesTotal / 60).toFixed(1)} hrs)</div>
-                      <span className="text-xs text-slate-500 block mt-0.5">Calculated from module upskilling</span>
-                    </div>
-                  </div>
-
-                  <form onSubmit={handleFridaySubmit} className="space-y-3">
-                    <div>
-                      <label className="text-xs text-slate-400 block mb-1">1-Sentence Wrap-up & Reflection</label>
-                      <input 
-                        type="text" 
-                        value={fridayOutcome} 
-                        onChange={e => setFridayOutcome(e.target.value)} 
-                        placeholder={`e.g. Achieved ${weeklyReconciliation.percent}% of deliverables across scheduled workshops.`}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200" 
-                      />
-                    </div>
-                    <button 
-                      type="submit" 
-                      disabled={isSubmittingFriday} 
-                      className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 text-white font-medium py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg"
-                    >
-                      <Send className="h-4 w-4" /> Submit Friday Review (+50 XP)
+                    <button type="submit" disabled={isAddingItem} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-lg">
+                      <Plus className="h-4 w-4" /> {isAddingItem ? "Adding..." : "+ Add to Bucket"}
                     </button>
                   </form>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-semibold text-sm text-slate-200">My Task Collection ({currentWorkboard.length})</h4>
+                    <span className="text-xs text-slate-400">Click "Log Session" on any card to update hours & progress</span>
+                  </div>
+
+                  {currentWorkboard.length === 0 ? (
+                    <div className="p-8 text-center bg-slate-900/50 rounded-2xl border border-slate-800 text-slate-500 text-sm">
+                      Your collection is empty for this week.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {currentWorkboard.map(item => {
+                        const progress = Number(item.Auto_Task_Hours || 0);
+                        const mins = Number(item.Auto_Learning_Hours || 0);
+                        const isDone = progress >= 100;
+
+                        return (
+                          <div key={item.Pulse_ID} className={`p-4 rounded-2xl border transition ${isDone ? "bg-slate-900/40 border-emerald-500/30" : "bg-slate-900/90 border-slate-800 hover:border-slate-700"}`}>
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <span className="text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono font-medium">
+                                  {item.Project_ID} {item.Task_Code ? `• ${item.Task_Code}` : ''}
+                                </span>
+                                {item.Friday_Outcome === "Founder" && (
+                                  <span className="ml-2 text-[10px] px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                                    Assigned by Leadership
+                                  </span>
+                                )}
+                              </div>
+                              <span className={`text-xs px-2 py-0.5 rounded font-mono font-bold ${isDone ? "bg-emerald-500/20 text-emerald-400" : "bg-slate-800 text-slate-300"}`}>
+                                {progress}%
+                              </span>
+                            </div>
+
+                            <h5 className="font-medium text-sm text-white mb-3">{item.Monday_Commitment}</h5>
+
+                            <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden mb-3">
+                              <div className={`h-full transition-all duration-300 ${isDone ? "bg-emerald-400" : "bg-blue-500"}`} style={{ width: `${Math.min(100, progress)}%` }} />
+                            </div>
+
+                            <div className="flex justify-between items-center pt-1 border-t border-slate-800/60 text-xs">
+                              <span className="text-slate-400 font-mono flex items-center gap-1">
+                                <Clock className="h-3 w-3 text-amber-400" /> {mins} mins logged ({(mins/60).toFixed(1)}h)
+                              </span>
+                              <button
+                                onClick={() => handleOpenLogModal(item)}
+                                className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium flex items-center gap-1.5 shadow-md shadow-blue-600/20"
+                              >
+                                <Sliders className="h-3 w-3" /> Log Session
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* TAB 3: L1–L4 AUTONOMY MATRIX EXPLANATION */}
-            {activeTab === "levels" && (
+            {employeeTab === "levels" && (
               <div className="space-y-4">
                 <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
                   <h3 className="font-bold text-base text-slate-100 mb-1 flex items-center gap-2">
                     <BarChart3 className="h-5 w-5 text-amber-400" /> Organizational Autonomy Levels (L1 – L4)
                   </h3>
-                  <p className="text-xs text-slate-400 mb-4">
-                    Clear expectations for communication, ownership, and progression across the company.
-                  </p>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     <div className="p-4 bg-slate-950/70 rounded-xl border border-slate-800">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2 py-0.5 rounded text-xs bg-slate-800 text-blue-400 font-bold border border-slate-700">Level 1</span>
-                        <h4 className="font-semibold text-sm text-white">Foundational / Guided Execution</h4>
-                      </div>
-                      <p className="text-xs text-amber-300 font-mono mb-2">"I deliver defined tasks with guidance."</p>
-                      <p className="text-xs text-slate-400 leading-relaxed">
-                        Follows standard operating procedures, kit assembly guidelines, and training scripts. Focused on building speed, punctuality, and error-free execution.
-                      </p>
+                      <span className="px-2 py-0.5 rounded text-xs bg-slate-800 text-blue-400 font-bold border border-slate-700">Level 1</span>
+                      <h4 className="font-semibold text-sm text-white mt-1">Foundational / Guided Execution</h4>
+                      <p className="text-xs text-slate-400 mt-2">Follows SOPs and kit assembly workflows with direct guidance.</p>
                     </div>
-
                     <div className="p-4 bg-slate-950/70 rounded-xl border border-slate-800">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2 py-0.5 rounded text-xs bg-slate-800 text-blue-400 font-bold border border-slate-700">Level 2</span>
-                        <h4 className="font-semibold text-sm text-white">Independent Contributor</h4>
-                      </div>
-                      <p className="text-xs text-emerald-300 font-mono mb-2">"I own my schedule and solve routine bottlenecks."</p>
-                      <p className="text-xs text-slate-400 leading-relaxed">
-                        Executes school workshops, design collateral, or accounts end-to-end without daily supervision. Anticipates missing materials and resolves minor school delays proactively.
-                      </p>
+                      <span className="px-2 py-0.5 rounded text-xs bg-slate-800 text-blue-400 font-bold border border-slate-700">Level 2</span>
+                      <h4 className="font-semibold text-sm text-white mt-1">Independent Contributor</h4>
+                      <p className="text-xs text-slate-400 mt-2">Owns school workshops and design deliverables end-to-end without constant oversight.</p>
                     </div>
-
                     <div className="p-4 bg-slate-950/70 rounded-xl border border-slate-800">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2 py-0.5 rounded text-xs bg-slate-800 text-indigo-400 font-bold border border-slate-700">Level 3</span>
-                        <h4 className="font-semibold text-sm text-white">Advanced / Lead Execution</h4>
-                      </div>
-                      <p className="text-xs text-indigo-300 font-mono mb-2">"I optimize systems, mentor others, and deliver complex outcomes."</p>
-                      <p className="text-xs text-slate-400 leading-relaxed">
-                        Leads multi-school rollouts, develops new kit experiments, or builds automated tools. Mentors L1/L2 teammates and creates reusable company playbooks.
-                      </p>
+                      <span className="px-2 py-0.5 rounded text-xs bg-slate-800 text-indigo-400 font-bold border border-slate-700">Level 3</span>
+                      <h4 className="font-semibold text-sm text-white mt-1">Advanced / Lead Execution</h4>
+                      <p className="text-xs text-slate-400 mt-2">Leads multi-school rollouts, builds kit experiments, and mentors L1/L2 peers.</p>
                     </div>
-
                     <div className="p-4 bg-slate-950/70 rounded-xl border border-slate-800">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2 py-0.5 rounded text-xs bg-slate-800 text-purple-400 font-bold border border-slate-700">Level 4</span>
-                        <h4 className="font-semibold text-sm text-white">Strategic / Pillar Owner</h4>
-                      </div>
-                      <p className="text-xs text-purple-300 font-mono mb-2">"I create the roadmap, align resources, and drive company growth."</p>
-                      <p className="text-xs text-slate-400 leading-relaxed">
-                        Directs business pillars (B2B School Growth, Dexter Box Product Line, ATL Operations). Translates leadership priorities into quarter-long roadmaps.
-                      </p>
+                      <span className="px-2 py-0.5 rounded text-xs bg-slate-800 text-purple-400 font-bold border border-slate-700">Level 4</span>
+                      <h4 className="font-semibold text-sm text-white mt-1">Strategic / Pillar Owner</h4>
+                      <p className="text-xs text-slate-400 mt-2">Drives business growth roadmaps, ATL operations, and product scaling.</p>
                     </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* TAB 4: COMPANY CATALOG & LIBRARIES */}
-            {activeTab === "catalog" && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
-                    <h4 className="font-semibold text-sm text-slate-200 mb-3 flex items-center gap-2">
-                      <FolderPlus className="h-4 w-4 text-blue-400" /> Active Projects ({projects.length})
-                    </h4>
-                    {projects.length === 0 ? (
-                      <p className="text-xs text-slate-500">No active projects created yet.</p>
-                    ) : (
-                      <div className="divide-y divide-slate-800/60">
-                        {projects.map(p => (
-                          <div key={p.Project_ID} className="py-2.5 flex justify-between items-center text-xs">
-                            <div>
-                              <span className="font-mono text-blue-400 font-medium">[{p.Project_ID}]</span>{" "}
-                              <span className="text-slate-200">{p.Project_Name}</span>
-                            </div>
-                            <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                              {p.Priority_Level}
-                            </span>
-                          </div>
-                        ))}
+            {employeeTab === "catalog" && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
+                  <h4 className="font-semibold text-sm text-slate-200 mb-3 flex items-center gap-2">
+                    <FolderPlus className="h-4 w-4 text-blue-400" /> Active Projects ({projects.length})
+                  </h4>
+                  <div className="divide-y divide-slate-800/60">
+                    {projects.map(p => (
+                      <div key={p.Project_ID} className="py-2.5 flex justify-between items-center text-xs">
+                        <span className="font-mono text-blue-400">[{p.Project_ID}] {p.Project_Name}</span>
+                        <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">{p.Priority_Level}</span>
                       </div>
-                    )}
-                  </div>
-
-                  <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
-                    <h4 className="font-semibold text-sm text-slate-200 mb-3 flex items-center gap-2">
-                      <ListPlus className="h-4 w-4 text-emerald-400" /> Master Reusable Task Codes ({tasks.length})
-                    </h4>
-                    {tasks.length === 0 ? (
-                      <p className="text-xs text-slate-500">No task codes in library yet.</p>
-                    ) : (
-                      <div className="divide-y divide-slate-800/60">
-                        {tasks.map(t => (
-                          <div key={t.Task_Code} className="py-2.5 flex justify-between items-center text-xs">
-                            <div>
-                              <span className="font-mono text-emerald-400 font-medium">[{t.Task_Code}]</span>{" "}
-                              <span className="text-slate-200">{t.Task_Title}</span>
-                            </div>
-                            <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                              {t.Category}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    ))}
                   </div>
                 </div>
 
                 <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
                   <h4 className="font-semibold text-sm text-slate-200 mb-3 flex items-center gap-2">
-                    <GraduationCap className="h-4 w-4 text-purple-400" /> Deliberate Learning Modules ({learningModules.length})
+                    <ListPlus className="h-4 w-4 text-emerald-400" /> Reusable Task Codes ({tasks.length})
                   </h4>
-                  {learningModules.length === 0 ? (
-                    <p className="text-xs text-slate-500">No learning modules added yet.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                      {learningModules.map(m => (
-                        <div key={m.Module_Code} className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs space-y-1">
-                          <span className="font-mono text-purple-400 font-medium">[{m.Module_Code}]</span>
-                          <div className="text-slate-200 font-medium">{m.Topic_Title}</div>
-                          <div className="text-slate-500">{m.Domain} • {m.Target_Proficiency}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <div className="divide-y divide-slate-800/60">
+                    {tasks.map(t => (
+                      <div key={t.Task_Code} className="py-2.5 flex justify-between items-center text-xs">
+                        <span className="font-mono text-emerald-400">[{t.Task_Code}] {t.Task_Title}</span>
+                        <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">{t.Category}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* TAB 5: MY R&R (CONCISE BASELINE KRAS) */}
-            {activeTab === "rnr" && (
+            {employeeTab === "rnr" && (
               <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <BookOpen className="h-4 w-4 text-blue-400" />
@@ -1296,7 +1026,132 @@ export default function App() {
         )}
       </main>
 
-      {/* FOUNDER MODALS */}
+      {/* MODAL: IN-CARD LOGGING SLIDERS */}
+      {activeLoggingItem && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono font-medium">
+                  {activeLoggingItem.Project_ID} • {activeLoggingItem.Task_Code}
+                </span>
+                <h3 className="text-base font-bold text-white mt-1">{activeLoggingItem.Monday_Commitment}</h3>
+              </div>
+              <button onClick={() => setActiveLoggingItem(null)} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+
+            <form onSubmit={handleSaveTaskSession} className="space-y-4 text-xs">
+              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-300 font-medium">Session Duration:</span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-mono font-bold border border-blue-500/30">
+                    {sessionSliderHours}h {sessionSliderMins}m ({(sessionSliderHours * 60) + sessionSliderMins} mins)
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                      <span>Hours</span>
+                      <span className="font-semibold text-white">{sessionSliderHours}h</span>
+                    </div>
+                    <input 
+                      type="range" min="0" max="8" step="1" 
+                      value={sessionSliderHours} 
+                      onChange={e => setSessionSliderHours(Number(e.target.value))} 
+                      className="w-full accent-blue-500 cursor-pointer" 
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                      <span>Minutes</span>
+                      <span className="font-semibold text-white">{sessionSliderMins}m</span>
+                    </div>
+                    <input 
+                      type="range" min="0" max="45" step="15" 
+                      value={sessionSliderMins} 
+                      onChange={e => setSessionSliderMins(Number(e.target.value))} 
+                      className="w-full accent-blue-500 cursor-pointer" 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-300 font-medium">Update Progress:</span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono font-bold border border-emerald-500/30">
+                    {sessionProgress}% {sessionProgress >= 100 ? "• Completed!" : ""}
+                  </span>
+                </div>
+                <input 
+                  type="range" min="0" max="100" step="5" 
+                  value={sessionProgress} 
+                  onChange={e => setSessionProgress(Number(e.target.value))} 
+                  className="w-full accent-emerald-500 cursor-pointer" 
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Session Context Note</label>
+                <input 
+                  type="text" 
+                  value={sessionNotes} 
+                  onChange={e => setSessionNotes(e.target.value)} 
+                  placeholder="e.g. Conducted morning workshops in 2 classrooms" 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200" 
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setActiveLoggingItem(null)} className="px-4 py-2 rounded-lg text-slate-400 hover:text-white">Cancel</button>
+                <button type="submit" disabled={isSubmittingSession} className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 text-white font-medium rounded-lg shadow-lg">
+                  {isSubmittingSession ? "Saving..." : "Save Session & Advance Streak (+35 XP)"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ASSIGN TASK TO EMPLOYEE BUCKET */}
+      {showAssignModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-3">Assign Task to Employee Bucket</h3>
+            <form onSubmit={handleAddWorkboardItem} className="space-y-3 text-sm">
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Assignee</label>
+                <select required value={assigneeEmail} onChange={e => setAssigneeEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200">
+                  {employees.map(e => <option key={e.Email} value={e.Email}>{e.Name} ({e.Email})</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Project</label>
+                <select required value={newItemProject} onChange={e => setNewItemProject(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200">
+                  {projects.map(p => <option key={p.Project_ID} value={p.Project_ID}>[{p.Project_ID}] {p.Project_Name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Task Code</label>
+                <select required value={newItemTaskCode} onChange={e => setNewItemTaskCode(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200">
+                  {tasks.map(t => <option key={t.Task_Code} value={t.Task_Code}>[{t.Task_Code}] {t.Task_Title}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Goal / Deliverable Statement</label>
+                <input required type="text" value={newItemTitle} onChange={e => setNewItemTitle(e.target.value)} placeholder="e.g. Prepare Maharishi school pitch presentation" className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200" />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setShowAssignModal(false)} className="px-4 py-2 rounded-lg text-slate-400 hover:text-white">Cancel</button>
+                <button type="submit" disabled={isAddingItem} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium">Assign to Bucket</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* FOUNDER MASTER CREATION MODALS */}
       {showEmpModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
@@ -1313,7 +1168,7 @@ export default function App() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs text-slate-400 block mb-1">Role Title</label>
-                  <input required type="text" value={newEmp.roleTitle} onChange={e => setNewEmp({...newEmp, roleTitle: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200" placeholder="e.g. Founder & STEM Lead" />
+                  <input required type="text" value={newEmp.roleTitle} onChange={e => setNewEmp({...newEmp, roleTitle: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200" placeholder="e.g. STEM Trainer" />
                 </div>
                 <div>
                   <label className="text-xs text-slate-400 block mb-1">Autonomy Level</label>
@@ -1326,8 +1181,8 @@ export default function App() {
                 </div>
               </div>
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Concise Baseline R&R (3-4 bullet KRAs)</label>
-                <textarea rows="3" required value={newEmp.rnrSummary} onChange={e => setNewEmp({...newEmp, rnrSummary: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200" placeholder="e.g. 1. Deliver STEM workshops in 4 schools weekly&#10;2. Calibrate & audit lab kits weekly&#10;3. Zero school delivery escalations" />
+                <label className="text-xs text-slate-400 block mb-1">Concise Baseline KRAs</label>
+                <textarea rows="3" required value={newEmp.rnrSummary} onChange={e => setNewEmp({...newEmp, rnrSummary: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200" placeholder="e.g. 1. Deliver STEM workshops in 4 schools&#10;2. Calibrate lab kits&#10;3. Zero delivery escalations" />
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setShowEmpModal(false)} className="px-4 py-2 rounded-lg text-slate-400 hover:text-white">Cancel</button>
@@ -1393,46 +1248,6 @@ export default function App() {
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setShowTskModal(false)} className="px-4 py-2 rounded-lg text-slate-400 hover:text-white">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium">Add to Library</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showLrnModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-3">Add Deliberate Learning Module</h3>
-            <form onSubmit={handleAddLearningModule} className="space-y-3 text-sm">
-              <div>
-                <label className="text-xs text-slate-400 block mb-1">Module Code</label>
-                <input required type="text" value={newLrn.moduleCode} onChange={e => setNewLrn({...newLrn, moduleCode: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200 uppercase" placeholder="e.g. LRN-ROB-01" />
-              </div>
-              <div>
-                <label className="text-xs text-slate-400 block mb-1">Domain</label>
-                <select value={newLrn.domain} onChange={e => setNewLrn({...newLrn, domain: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200">
-                  <option value="STEM Hardware">STEM Hardware & Sensors</option>
-                  <option value="AI & Digital Media">AI & Digital Media</option>
-                  <option value="Design & Prototyping">Design & Prototyping (CAD/MDF)</option>
-                  <option value="Pedagogy & Classroom">Pedagogy & Delivery</option>
-                  <option value="Finance & Growth">Finance, Ops & Growth</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-slate-400 block mb-1">Topic Title</label>
-                <input required type="text" value={newLrn.topicTitle} onChange={e => setNewLrn({...newLrn, topicTitle: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200" placeholder="e.g. Raspberry Pi Python GPIO Control" />
-              </div>
-              <div>
-                <label className="text-xs text-slate-400 block mb-1">Target Proficiency</label>
-                <select value={newLrn.targetProficiency} onChange={e => setNewLrn({...newLrn, targetProficiency: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200">
-                  <option value="Foundational">Foundational</option>
-                  <option value="Intermediate">Intermediate</option>
-                  <option value="Advanced">Advanced Mastery</option>
-                </select>
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setShowLrnModal(false)} className="px-4 py-2 rounded-lg text-slate-400 hover:text-white">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium">Add to Library</button>
               </div>
             </form>
           </div>
