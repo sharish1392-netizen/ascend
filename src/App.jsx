@@ -7,7 +7,7 @@ import {
   UserCheck, Users, PieChart, Activity, Calendar
 } from 'lucide-react';
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw9dwtPvz3EOGWNDcSSFxCUQftWb7zDa632MatuA1MzMQIYlHSuDr8ZpF6ZfCJzY7t6Iw/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz7ZFH8WtVf33bh98R9eMwo4rCYr4Evk2WeHmYdkjKgFgCGrrEPMFxrYwX0bQlZSrjUhQ/exec";
 
 function getCurrentMonday() {
   const d = new Date();
