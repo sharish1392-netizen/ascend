@@ -5,7 +5,8 @@ import {
   ListPlus, CalendarCheck, Zap, GraduationCap, LayoutGrid,
   Plus, Trash2, BarChart3, Sliders, UserCheck, Users, 
   PieChart, Activity, Edit3, Rocket, Filter, Check, Database,
-  Mic, MicOff, Wand2, Smartphone, Monitor, Key, X, ArrowRight
+  Mic, MicOff, Wand2, Smartphone, Monitor, Key, X, ArrowRight,
+  Sun, Moon
 } from 'lucide-react';
 
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz4v1XX9-m0Zu_xEgEzyeCI361wydctuHupDCxgPEhfDWuqgD-AtVrESJ-s6cE4kA2xtA/exec";
@@ -50,10 +51,7 @@ const DEFAULT_LEARNING = [
 
 function getTodayStr() {
   const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function getCurrentMondayStr() {
@@ -61,47 +59,30 @@ function getCurrentMondayStr() {
   const day = d.getDay();
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   const mon = new Date(d.setDate(diff));
-  const year = mon.getFullYear();
-  const month = String(mon.getMonth() + 1).padStart(2, '0');
-  const dt = String(mon.getDate()).padStart(2, '0');
-  return `${year}-${month}-${dt}`;
+  return `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
 }
 
 function normalizeDateStr(val) {
   if (!val) return "";
   const str = String(val);
-  if (str.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(str)) {
-    return str.slice(0, 10);
-  }
+  if (str.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
   const parsed = new Date(str);
   if (!isNaN(parsed.getTime())) {
-    const y = parsed.getFullYear();
-    const m = String(parsed.getMonth() + 1).padStart(2, '0');
-    const d = String(parsed.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
   }
   return str;
 }
 
 function mergeById(remoteArr, localArr, idKey) {
   const map = new Map();
-  (remoteArr || []).forEach(item => {
-    if (item && item[idKey]) map.set(item[idKey], item);
-  });
-  (localArr || []).forEach(item => {
-    if (item && item[idKey] && !map.has(item[idKey])) {
-      map.set(item[idKey], item);
-    }
-  });
+  (remoteArr || []).forEach(item => { if (item && item[idKey]) map.set(item[idKey], item); });
+  (localArr || []).forEach(item => { if (item && item[idKey] && !map.has(item[idKey])) map.set(item[idKey], item); });
   return Array.from(map.values());
 }
 
 function calculateUniqueDayStreak(userLogs) {
   if (!userLogs || userLogs.length === 0) return 0;
-  const uniqueDates = Array.from(
-    new Set(userLogs.map(l => normalizeDateStr(l.Date)).filter(Boolean))
-  ).sort().reverse();
-  
+  const uniqueDates = Array.from(new Set(userLogs.map(l => normalizeDateStr(l.Date)).filter(Boolean))).sort().reverse();
   if (uniqueDates.length === 0) return 0;
 
   const today = getTodayStr();
@@ -116,17 +97,12 @@ function calculateUniqueDayStreak(userLogs) {
   for (let i = 1; i < uniqueDates.length; i++) {
     const prev = new Date(uniqueDates[i]);
     const diffDays = Math.round((curr - prev) / (1000 * 60 * 60 * 24));
-    if (diffDays === 1) {
-      streak++;
-      curr = prev;
-    } else if (diffDays > 1) {
-      break;
-    }
+    if (diffDays === 1) { streak++; curr = prev; }
+    else if (diffDays > 1) break;
   }
   return streak;
 }
 
-// ================= MULTI-CLAUSE VOICE SPLITTER (100% LOCAL, NO API KEY NEEDED) =================
 function splitSpokenMultiTasks(rawInput) {
   if (!rawInput) return [];
   let text = rawInput
@@ -137,21 +113,16 @@ function splitSpokenMultiTasks(rawInput) {
     .replace(/\btwo hours\b/gi, "2 hours")
     .replace(/\bthree hours\b/gi, "3 hours")
     .replace(/\bfour hours\b/gi, "4 hours")
-    .replace(/\bhalf an hour\b/gi, "30 mins")
-    .replace(/\bhalf hour\b/gi, "30 mins");
+    .replace(/\bhalf an hour\b/gi, "30 mins");
 
   const primaryDelimiters = /\s*(?:;|\band then\b|\balso\b|\bplus\b|\bafter that\b|\bnext\b|\bsecondly\b|\bthirdly\b|\bapart from that\b|\bas well as\b)\s*|\s+\band\b\s+(?=(?:spent|worked|did|completed|finished|logged|add|create|plan|need to|studied|learned|\d+\s*(?:hours?|hrs?|h|minutes?|mins?|m)\b))/i;
 
   let chunks = text.split(primaryDelimiters).map(s => s.trim()).filter(Boolean);
-
   const finalSegments = [];
   chunks.forEach(chunk => {
     const subParts = chunk.split(/,\s*(?=(?:spent|worked|did|add|plan|\d+(?:\.\d+)?\s*(?:hours?|hrs?|h|minutes?|mins?|m)\b))/i);
-    subParts.forEach(sp => {
-      if (sp.trim()) finalSegments.push(sp.trim());
-    });
+    subParts.forEach(sp => { if (sp.trim()) finalSegments.push(sp.trim()); });
   });
-
   return finalSegments.length > 0 ? finalSegments : [rawInput.trim()];
 }
 
@@ -167,39 +138,19 @@ function matchOrMintTaskCode(segmentText, tasksCatalog, learnedAliasesMap) {
     let score = 0;
     const codeKey = t.Task_Code;
     const combinedText = `${t.Task_Title} ${t.Category} ${t.Aliases || ""} ${(learnedAliasesMap[codeKey] || []).join(" ")}`.toLowerCase();
+    const aliasList = `${t.Aliases || ""}, ${(learnedAliasesMap[codeKey] || []).join(", ")}`.split(",").map(a => a.trim().toLowerCase()).filter(Boolean);
 
-    const aliasList = `${t.Aliases || ""}, ${(learnedAliasesMap[codeKey] || []).join(", ")}`
-      .split(",")
-      .map(a => a.trim().toLowerCase())
-      .filter(Boolean);
-
-    aliasList.forEach(alias => {
-      if (alias.length > 2 && lower.includes(alias)) {
-        score += 4;
-      }
-    });
-
+    aliasList.forEach(alias => { if (alias.length > 2 && lower.includes(alias)) score += 4; });
     tokens.forEach(tok => {
       const stem = tok.replace(/(?:ing|ed|s|es)$/, "");
-      if (stem.length >= 3 && combinedText.includes(stem)) {
-        score += 2;
-      }
+      if (stem.length >= 3 && combinedText.includes(stem)) score += 2;
     });
 
-    if (score > highestScore) {
-      highestScore = score;
-      bestTask = t;
-    }
+    if (score > highestScore) { highestScore = score; bestTask = t; }
   });
 
   if (bestTask && highestScore >= 2) {
-    return {
-      taskCode: bestTask.Task_Code,
-      taskTitle: bestTask.Task_Title,
-      category: bestTask.Category || "General",
-      isNewTask: false,
-      triggerToken: tokens[0] || ""
-    };
+    return { taskCode: bestTask.Task_Code, taskTitle: bestTask.Task_Title, category: bestTask.Category || "General", isNewTask: false, triggerToken: tokens[0] || "" };
   }
 
   const meaningfulWords = tokens.filter(w => !/^(dexter|maker|atl|atal|csr|ngo|step|amt|maharishi|velammal)$/.test(w));
@@ -208,13 +159,7 @@ function matchOrMintTaskCode(segmentText, tasksCatalog, learnedAliasesMap) {
 
   const existingCodeMatch = tasksCatalog.find(t => t.Task_Code === candidateCode);
   if (existingCodeMatch) {
-    return {
-      taskCode: existingCodeMatch.Task_Code,
-      taskTitle: existingCodeMatch.Task_Title,
-      category: existingCodeMatch.Category || "General",
-      isNewTask: false,
-      triggerToken: tokens[0] || ""
-    };
+    return { taskCode: existingCodeMatch.Task_Code, taskTitle: existingCodeMatch.Task_Title, category: existingCodeMatch.Category || "General", isNewTask: false, triggerToken: tokens[0] || "" };
   }
 
   let inferredCategory = "Operations & Supply Chain";
@@ -225,13 +170,7 @@ function matchOrMintTaskCode(segmentText, tasksCatalog, learnedAliasesMap) {
 
   const cleanNewTitle = meaningfulWords.slice(0, 3).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") || "Specialized Activity";
 
-  return {
-    taskCode: candidateCode,
-    taskTitle: `${cleanNewTitle} & Execution`,
-    category: inferredCategory,
-    isNewTask: true,
-    triggerToken: meaningfulWords.join(", ")
-  };
+  return { taskCode: candidateCode, taskTitle: `${cleanNewTitle} & Execution`, category: inferredCategory, isNewTask: true, triggerToken: meaningfulWords.join(", ") };
 }
 
 function localSmartParse(inputText, employees, tasksCatalog, learnedAliasesMap, currentWorkboard, activeEmail) {
@@ -240,7 +179,6 @@ function localSmartParse(inputText, employees, tasksCatalog, learnedAliasesMap, 
 
   return segments.map((seg, idx) => {
     const lower = seg.toLowerCase();
-
     let minutes = 0;
     const hrMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h\b)/);
     const minMatch = lower.match(/(\d+)\s*(?:minutes?|mins?|m\b)/);
@@ -249,56 +187,39 @@ function localSmartParse(inputText, employees, tasksCatalog, learnedAliasesMap, 
 
     let progress = minutes > 0 ? 100 : 0;
     const progMatch = lower.match(/(\d+)\s*%/);
-    if (progMatch) {
-      progress = Math.min(100, Math.max(0, parseInt(progMatch[1], 10)));
-    } else if (lower.includes("half done") || lower.includes("in progress") || lower.includes("partially")) {
-      progress = 50;
-    } else if (lower.includes("completed") || lower.includes("finished") || lower.includes("done")) {
-      progress = 100;
-    }
+    if (progMatch) progress = Math.min(100, Math.max(0, parseInt(progMatch[1], 10)));
+    else if (lower.includes("half done") || lower.includes("in progress")) progress = 50;
+    else if (lower.includes("completed") || lower.includes("finished") || lower.includes("done")) progress = 100;
 
     let intent = minutes > 0 ? "LOG_TIME" : "ADD_TASK";
-    if (lower.startsWith("add ") || lower.startsWith("plan ") || lower.startsWith("todo") || lower.includes("need to") || lower.includes("have to")) {
-      intent = "ADD_TASK";
-    }
-    if (lower.includes("upskill") || lower.includes("studied") || lower.includes("learned") || lower.includes("practiced")) {
-      if (minutes > 0) intent = "LOG_LEARNING";
-    }
+    if (lower.startsWith("add ") || lower.startsWith("plan ") || lower.includes("need to")) intent = "ADD_TASK";
 
     let projectId = "PRJ-MAKER";
     if (/dexter|kit|box|grade/.test(lower)) projectId = "PRJ-DEXTER";
-    else if (/atl|atal|tinkering|niti/.test(lower)) projectId = "PRJ-ATL";
-    else if (/csr|ngo|sponsor|foundation/.test(lower)) projectId = "PRJ-CSR";
-    else if (/step|teacher|faculty|educator|pedagogy/.test(lower)) projectId = "PRJ-STEP";
-    else if (/admin|salary|payroll|hr|invoice|account|office|safety|legal/.test(lower)) projectId = "PRJ-ADMIN";
-    else if (/maker|studio|lab|amt|expo|school/.test(lower)) projectId = "PRJ-MAKER";
+    else if (/atl|atal|tinkering/.test(lower)) projectId = "PRJ-ATL";
+    else if (/csr|ngo|sponsor/.test(lower)) projectId = "PRJ-CSR";
+    else if (/step|teacher|pedagogy/.test(lower)) projectId = "PRJ-STEP";
+    else if (/admin|salary|hr|invoice|account/.test(lower)) projectId = "PRJ-ADMIN";
 
     const taskMatch = matchOrMintTaskCode(seg, tasksCatalog, learnedAliasesMap);
-
     const collaborators = [activeEmail].filter(Boolean);
     (employees || []).forEach(emp => {
       const firstName = (emp.Name || "").split(" ")[0].toLowerCase();
-      if (firstName.length > 2 && lower.includes(firstName) && !collaborators.includes(emp.Email)) {
-        collaborators.push(emp.Email);
-      }
+      if (firstName.length > 2 && lower.includes(firstName) && !collaborators.includes(emp.Email)) collaborators.push(emp.Email);
     });
 
     let matchedPulseId = null;
     if (intent === "LOG_TIME" && currentWorkboard?.length > 0) {
-      const match = currentWorkboard.find(p => 
-        p.Project_ID === projectId && p.Task_Code === taskMatch.taskCode && Number(p.Auto_Task_Hours || 0) < 100
-      ) || currentWorkboard.find(p => 
-        p.Project_ID === projectId && Number(p.Auto_Task_Hours || 0) < 100
-      );
+      const match = currentWorkboard.find(p => p.Project_ID === projectId && p.Task_Code === taskMatch.taskCode && Number(p.Auto_Task_Hours || 0) < 100) ||
+                    currentWorkboard.find(p => p.Project_ID === projectId && Number(p.Auto_Task_Hours || 0) < 100);
       if (match) matchedPulseId = match.Pulse_ID;
     }
 
     let cleanTitle = seg
-      .replace(/^(add task|add|log|spent|worked|did|completed|finished|need to|have to)\s*:?\s*/i, "")
+      .replace(/^(add task|add|log|spent|worked|did|completed|finished|need to)\s*:?\s*/i, "")
       .replace(/\b\d+(?:\.\d+)?\s*(?:hours?|hrs?|h|minutes?|mins?|m)\b/gi, "")
       .replace(/\b(?:on|for|in)\b\s+/i, "")
       .replace(/\b\d+\s*%/g, "")
-      .replace(/\s+/g, " ")
       .trim();
     if (cleanTitle.length < 3) cleanTitle = seg.trim();
     cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
@@ -318,83 +239,14 @@ function localSmartParse(inputText, employees, tasksCatalog, learnedAliasesMap, 
       deadline: today,
       collaborators,
       matchedPulseId,
-      learningModuleCode: "LRN-HARD-01",
       engine: "Smart Multi-Task Local Engine"
     };
   });
 }
 
-async function geminiSmartParse(inputText, apiKey, projects, tasks, employees, activeEmail, currentWorkboard) {
-  const today = getTodayStr();
-  const prompt = `You are an operational task & time parser for Infinite Engineers (IE Skool).
-Today's date is ${today}. Active user email: ${activeEmail}.
-Available Projects: ${JSON.stringify(projects.map(p => ({ id: p.Project_ID, name: p.Project_Name })))}
-Available Tasks: ${JSON.stringify(tasks.map(t => ({ code: t.Task_Code, title: t.Task_Title, category: t.Category, aliases: t.Aliases || "" })))}
-Available Team Members: ${JSON.stringify(employees.map(e => ({ name: e.Name, email: e.Email })))}
-
-Split and parse the following user voice/text input into a JSON array of distinct task objects (if the user mentions 2 or 3 tasks, output 2 or 3 objects).
-Input: "${inputText}"
-
-Anti-Duplicate Rules:
-- Always map to the closest existing Task_Code in Available Tasks if there is even 60% conceptual similarity.
-- ONLY set "isNewTask": true and invent a new "taskCode" (format "TSK-XXXX"), "newTaskTitle", and "newTaskCategory" if the activity is genuinely unrepresented in Available Tasks.
-- Each object must have:
-  - "intent": "ADD_TASK" or "LOG_TIME" or "LOG_LEARNING"
-  - "projectId": best matching Project_ID
-  - "taskCode": existing Task_Code (or new TSK-XXXX if isNewTask is true)
-  - "isNewTask": boolean
-  - "newTaskTitle": string (title for the task code)
-  - "newTaskCategory": string (category bucket)
-  - "title": concise deliverable statement
-  - "minutes": integer minutes (0 if ADD_TASK)
-  - "progress": integer 0-100
-  - "deadline": YYYY-MM-DD
-  - "collaborators": array of emails
-Return ONLY a valid JSON array.`;
-
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: "application/json" }
-    })
-  });
-
-  const data = await response.json();
-  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
-  const parsed = JSON.parse(rawText);
-
-  return (Array.isArray(parsed) ? parsed : [parsed]).map((item, idx) => {
-    const existsInCatalog = tasks.some(t => t.Task_Code === item.taskCode);
-    let matchedPulseId = null;
-    if (item.intent === "LOG_TIME" && currentWorkboard?.length > 0) {
-      const match = currentWorkboard.find(p => p.Project_ID === item.projectId && p.Task_Code === item.taskCode && Number(p.Auto_Task_Hours || 0) < 100);
-      if (match) matchedPulseId = match.Pulse_ID;
-    }
-    return {
-      id: Date.now() + idx + Math.random(),
-      intent: item.intent || "ADD_TASK",
-      projectId: item.projectId || "PRJ-MAKER",
-      taskCode: item.taskCode || "TSK-EXPO",
-      newTaskTitle: item.newTaskTitle || "Specialized Execution",
-      newTaskCategory: item.newTaskCategory || "Operations & Supply Chain",
-      isNewTask: Boolean(item.isNewTask && !existsInCatalog),
-      triggerToken: "",
-      title: item.title || inputText,
-      minutes: Number(item.minutes || 0),
-      progress: Number(item.progress ?? (item.intent === "LOG_TIME" ? 100 : 0)),
-      deadline: item.deadline || today,
-      collaborators: Array.isArray(item.collaborators) && item.collaborators.length > 0 ? item.collaborators : [activeEmail],
-      matchedPulseId,
-      learningModuleCode: "LRN-HARD-01",
-      engine: "Gemini 2.5 Flash AI"
-    };
-  });
-}
-
 export default function App() {
-  const [viewRole, setViewRole] = useState("employee");
+  const [theme, setTheme] = useState(() => localStorage.getItem("ie_theme") || "light"); // 'light' | 'dark'
+  const [viewRole, setViewRole] = useState("employee"); // 'employee' | 'company'
   const [activeEmployeeEmail, setActiveEmployeeEmail] = useState(() => localStorage.getItem("ie_v3_active_emp") || "");
   const [companyTab, setCompanyTab] = useState("workload");
   const [employeeTab, setEmployeeTab] = useState("workboard");
@@ -409,41 +261,22 @@ export default function App() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const [employees, setEmployees] = useState(() => {
-    const saved = localStorage.getItem("ie_v3_employees");
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [projects, setProjects] = useState(() => {
-    const saved = localStorage.getItem("ie_v3_projects");
-    return saved ? mergeById(JSON.parse(saved), DEFAULT_PROJECTS, "Project_ID") : DEFAULT_PROJECTS;
-  });
-  const [tasks, setTasks] = useState(() => {
-    const saved = localStorage.getItem("ie_v3_tasks");
-    return saved ? mergeById(JSON.parse(saved), DEFAULT_TASKS, "Task_Code") : DEFAULT_TASKS;
-  });
-  const [learnedAliases, setLearnedAliases] = useState(() => {
-    const saved = localStorage.getItem("ie_v4_learned_aliases");
-    return saved ? JSON.parse(saved) : {};
-  });
-  const [learningModules, setLearningModules] = useState(() => {
-    const saved = localStorage.getItem("ie_v3_learning");
-    return saved ? mergeById(JSON.parse(saved), DEFAULT_LEARNING, "Module_Code") : DEFAULT_LEARNING;
-  });
-  const [weeklyPulses, setWeeklyPulses] = useState(() => {
-    const saved = localStorage.getItem("ie_v3_pulses");
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [dailyLogs, setDailyLogs] = useState(() => {
-    const saved = localStorage.getItem("ie_v3_logs");
-    return saved ? JSON.parse(saved) : [];
-  });
+  useEffect(() => {
+    localStorage.setItem("ie_theme", theme);
+  }, [theme]);
+
+  const [employees, setEmployees] = useState(() => JSON.parse(localStorage.getItem("ie_v3_employees") || "[]"));
+  const [projects, setProjects] = useState(() => mergeById(JSON.parse(localStorage.getItem("ie_v3_projects") || "[]"), DEFAULT_PROJECTS, "Project_ID"));
+  const [tasks, setTasks] = useState(() => mergeById(JSON.parse(localStorage.getItem("ie_v3_tasks") || "[]"), DEFAULT_TASKS, "Task_Code"));
+  const [learnedAliases, setLearnedAliases] = useState(() => JSON.parse(localStorage.getItem("ie_v4_learned_aliases") || "{}"));
+  const [learningModules, setLearningModules] = useState(() => mergeById(JSON.parse(localStorage.getItem("ie_v3_learning") || "[]"), DEFAULT_LEARNING, "Module_Code"));
+  const [weeklyPulses, setWeeklyPulses] = useState(() => JSON.parse(localStorage.getItem("ie_v3_pulses") || "[]"));
+  const [dailyLogs, setDailyLogs] = useState(() => JSON.parse(localStorage.getItem("ie_v3_logs") || "[]"));
 
   const [smartInput, setSmartInput] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isParsingAI, setIsParsingAI] = useState(false);
   const [parsedPreviews, setParsedPreviews] = useState([]);
-  const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem("ie_gemini_api_key") || "");
-  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
   const recognitionRef = useRef(null);
 
@@ -526,9 +359,7 @@ export default function App() {
           setWeeklyPulses(prev => {
             const remoteMap = new Map();
             data.weeklyPulses.forEach(p => remoteMap.set(p.Pulse_ID, p));
-            prev.forEach(localP => {
-              if (!remoteMap.has(localP.Pulse_ID)) remoteMap.set(localP.Pulse_ID, localP);
-            });
+            prev.forEach(localP => { if (!remoteMap.has(localP.Pulse_ID)) remoteMap.set(localP.Pulse_ID, localP); });
             return Array.from(remoteMap.values());
           });
         }
@@ -724,20 +555,11 @@ export default function App() {
       const p = log.Project_ID || "UNASSIGNED";
       const val = Number(log.Task_Hours || 0);
       const mins = val > 24 ? val : Math.round(val * 60);
-      if (mins > 0) {
-        map[p] = (map[p] || 0) + mins;
-        grandTotalMins += mins;
-      }
+      if (mins > 0) { map[p] = (map[p] || 0) + mins; grandTotalMins += mins; }
     });
     return Object.entries(map).map(([projectId, mins]) => {
       const pObj = projects.find(pr => pr.Project_ID === projectId);
-      return {
-        projectId,
-        projectName: pObj ? pObj.Project_Name : projectId,
-        hours: (mins / 60).toFixed(1),
-        minutes: mins,
-        percentage: grandTotalMins > 0 ? Math.round((mins / grandTotalMins) * 100) : 0
-      };
+      return { projectId, projectName: pObj ? pObj.Project_Name : projectId, hours: (mins / 60).toFixed(1), minutes: mins, percentage: grandTotalMins > 0 ? Math.round((mins / grandTotalMins) * 100) : 0 };
     }).sort((a, b) => b.minutes - a.minutes);
   }, [filteredAnalyticsLogs, projects]);
 
@@ -748,21 +570,11 @@ export default function App() {
       const t = log.Task_Code || "GENERAL";
       const val = Number(log.Task_Hours || 0);
       const mins = val > 24 ? val : Math.round(val * 60);
-      if (mins > 0) {
-        map[t] = (map[t] || 0) + mins;
-        grandTotalMins += mins;
-      }
+      if (mins > 0) { map[t] = (map[t] || 0) + mins; grandTotalMins += mins; }
     });
     return Object.entries(map).map(([taskCode, mins]) => {
       const tObj = tasks.find(ts => ts.Task_Code === taskCode);
-      return {
-        taskCode,
-        taskTitle: tObj ? tObj.Task_Title : taskCode,
-        category: tObj ? tObj.Category : "General",
-        hours: (mins / 60).toFixed(1),
-        minutes: mins,
-        percentage: grandTotalMins > 0 ? Math.round((mins / grandTotalMins) * 100) : 0
-      };
+      return { taskCode, taskTitle: tObj ? tObj.Task_Title : taskCode, category: tObj ? tObj.Category : "General", hours: (mins / 60).toFixed(1), minutes: mins, percentage: grandTotalMins > 0 ? Math.round((mins / grandTotalMins) * 100) : 0 };
     }).sort((a, b) => b.minutes - a.minutes);
   }, [filteredAnalyticsLogs, tasks]);
 
@@ -782,15 +594,7 @@ export default function App() {
 
       const todayLogs = dailyLogs.filter(l => (l.Emp_Email || "").toLowerCase() === empEmail && normalizeDateStr(l.Date) === todayStr);
 
-      return {
-        ...emp,
-        activeCount: activeTasks.length,
-        doneCount: doneTasks.length,
-        weekLoggedHours: (weekMins / 60).toFixed(1),
-        activeTasksList: activeTasks,
-        doneTasksList: doneTasks.slice(-3),
-        todayLogsCount: todayLogs.length
-      };
+      return { ...emp, activeCount: activeTasks.length, doneCount: doneTasks.length, weekLoggedHours: (weekMins / 60).toFixed(1), activeTasksList: activeTasks, doneTasksList: doneTasks.slice(-3), todayLogsCount: todayLogs.length };
     });
   }, [employees, weeklyPulses, dailyLogs, currentMondayStr, todayStr]);
 
@@ -828,29 +632,19 @@ export default function App() {
     recognition.start();
   };
 
-  const handleAnalyzeSmartInput = async (e) => {
+  const handleAnalyzeSmartInput = (e) => {
     e.preventDefault();
     if (!smartInput.trim()) return;
     setIsParsingAI(true);
-
     try {
-      let results = [];
-      if (geminiApiKey.trim()) {
-        try {
-          results = await geminiSmartParse(smartInput, geminiApiKey.trim(), projects, tasks, employees, activeEmployeeEmail, currentWorkboard);
-        } catch (aiErr) {
-          results = localSmartParse(smartInput, employees, tasks, learnedAliases, currentWorkboard, activeEmployeeEmail);
-        }
-      } else {
-        results = localSmartParse(smartInput, employees, tasks, learnedAliases, currentWorkboard, activeEmployeeEmail);
-      }
+      const results = localSmartParse(smartInput, employees, tasks, learnedAliases, currentWorkboard, activeEmployeeEmail);
       setParsedPreviews(results);
     } finally {
       setIsParsingAI(false);
     }
   };
 
-  const handleConfirmSmartPreviews = async () => {
+  const handleConfirmSmartPreviews = () => {
     if (parsedPreviews.length === 0) return;
 
     const newPulsesBatch = [];
@@ -860,23 +654,12 @@ export default function App() {
     parsedPreviews.forEach(item => {
       const alreadyExists = tasks.some(t => t.Task_Code === item.taskCode) || newlyMintedTasks.some(t => t.Task_Code === item.taskCode);
       if (item.isNewTask && !alreadyExists) {
-        const mintedEntry = {
-          Task_Code: item.taskCode.toUpperCase().trim(),
-          Task_Title: item.newTaskTitle || item.title,
-          Category: item.newTaskCategory || "Operations & Supply Chain",
-          Aliases: item.triggerToken || item.title.toLowerCase()
-        };
+        const mintedEntry = { Task_Code: item.taskCode.toUpperCase().trim(), Task_Title: item.newTaskTitle || item.title, Category: item.newTaskCategory || "Operations & Supply Chain", Aliases: item.triggerToken || item.title.toLowerCase() };
         newlyMintedTasks.push(mintedEntry);
         try {
           fetch(APPS_SCRIPT_URL, {
             method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-            body: JSON.stringify({
-              action: "createTask",
-              taskCode: mintedEntry.Task_Code,
-              taskTitle: mintedEntry.Task_Title,
-              category: mintedEntry.Category,
-              aliases: mintedEntry.Aliases
-            })
+            body: JSON.stringify({ action: "createTask", taskCode: mintedEntry.Task_Code, taskTitle: mintedEntry.Task_Title, category: mintedEntry.Category, aliases: mintedEntry.Aliases })
           });
         } catch (err) {}
       }
@@ -921,38 +704,13 @@ export default function App() {
         if (item.matchedPulseId) {
           setWeeklyPulses(prev => prev.map(p => {
             if (p.Pulse_ID === item.matchedPulseId) {
-              return {
-                ...p,
-                Auto_Task_Hours: item.progress,
-                Auto_Learning_Hours: Number(p.Auto_Learning_Hours || 0) + Number(item.minutes || 60),
-                Status: item.progress >= 100 ? "Completed" : "In Progress",
-                Completed_Date: item.progress >= 100 ? todayStr : ""
-              };
+              return { ...p, Auto_Task_Hours: item.progress, Auto_Learning_Hours: Number(p.Auto_Learning_Hours || 0) + Number(item.minutes || 60), Status: item.progress >= 100 ? "Completed" : "In Progress", Completed_Date: item.progress >= 100 ? todayStr : "" };
             }
             return p;
           }));
-          try {
-            fetch(APPS_SCRIPT_URL, {
-              method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-              body: JSON.stringify({
-                action: "logTaskSession",
-                pulseId: item.matchedPulseId,
-                email: activeEmployeeEmail,
-                projectId: item.projectId,
-                taskCode: item.taskCode,
-                taskMinutes: Number(item.minutes || 60),
-                learningModuleCode: "None",
-                learningMinutes: 0,
-                progressPercent: item.progress,
-                currentStreak: currentStreak || 1,
-                status: item.progress >= 100 ? "Done" : "In Progress",
-                notes: item.title
-              })
-            });
-          } catch (err) {}
         } else {
           const newPulseId = "TSK-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
-          const createdCard = {
+          newPulsesBatch.push({
             Pulse_ID: newPulseId,
             Created_Date: todayStr,
             Emp_Email: activeEmployeeEmail,
@@ -966,85 +724,22 @@ export default function App() {
             Target_Deadline: todayStr,
             Completed_Date: item.progress >= 100 ? todayStr : "",
             Collaborators: collabStr
-          };
-          newPulsesBatch.push(createdCard);
-          try {
-            fetch(APPS_SCRIPT_URL, {
-              method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-              body: JSON.stringify({
-                action: "logTaskSession",
-                pulseId: newPulseId,
-                email: activeEmployeeEmail,
-                projectId: item.projectId,
-                taskCode: item.taskCode,
-                taskMinutes: Number(item.minutes || 60),
-                learningModuleCode: "None",
-                learningMinutes: 0,
-                progressPercent: item.progress,
-                currentStreak: currentStreak || 1,
-                status: item.progress >= 100 ? "Done" : "In Progress",
-                notes: item.title
-              })
-            });
-          } catch (err) {}
-        }
-      } else if (item.intent === "LOG_LEARNING") {
-        const lrnEntry = {
-          Log_ID: "LRN-" + Date.now(),
-          Date: todayStr,
-          Emp_Email: activeEmployeeEmail,
-          Project_ID: "UPSKILLING",
-          Task_Code: "TSK-LRN",
-          Task_Hours: 0,
-          Learning_Module_Code: item.learningModuleCode || "LRN-HARD-01",
-          Learning_Hours: Number(item.minutes || 45),
-          Status: "Done",
-          Streak_Count: currentStreak || 1,
-          Notes: item.title
-        };
-        newLogsBatch.push(lrnEntry);
-        try {
-          fetch(APPS_SCRIPT_URL, {
-            method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-            body: JSON.stringify({
-              action: "logStandaloneLearning",
-              email: activeEmployeeEmail,
-              learningModuleCode: lrnEntry.Learning_Module_Code,
-              learningMinutes: lrnEntry.Learning_Hours,
-              currentStreak: currentStreak || 1,
-              notes: item.title
-            })
           });
-        } catch (err) {}
+        }
       }
     });
 
-    if (newlyMintedTasks.length > 0) {
-      setTasks(prev => [...prev, ...newlyMintedTasks]);
-    }
-    if (newPulsesBatch.length > 0) {
-      setWeeklyPulses(prev => [...prev, ...newPulsesBatch]);
-      try {
-        fetch(APPS_SCRIPT_URL, {
-          method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({ action: "addWorkboardBatch", items: newPulsesBatch })
-        });
-      } catch (err) {}
-    }
-    if (newLogsBatch.length > 0) {
-      setDailyLogs(prev => [...prev, ...newLogsBatch]);
-    }
+    if (newlyMintedTasks.length > 0) setTasks(prev => [...prev, ...newlyMintedTasks]);
+    if (newPulsesBatch.length > 0) setWeeklyPulses(prev => [...prev, ...newPulsesBatch]);
+    if (newLogsBatch.length > 0) setDailyLogs(prev => [...prev, ...newLogsBatch]);
 
-    showToast(`Approved & saved ${parsedPreviews.length} item(s)${newlyMintedTasks.length > 0 ? ` + minted ${newlyMintedTasks.length} new task code(s)` : ""}!`);
+    showToast(`Approved & saved ${parsedPreviews.length} item(s)!`);
     setParsedPreviews([]);
     setSmartInput("");
   };
 
   const handleAddDraftRow = () => {
-    setDraftRows(prev => [
-      ...prev,
-      { id: Date.now() + Math.random(), projectId: projects[0]?.Project_ID || "PRJ-MAKER", category: taskCategories[0] || "BD & Client Proposals", taskCode: tasks[0]?.Task_Code || "TSK-PROP", title: "", deadline: todayStr }
-    ]);
+    setDraftRows(prev => [...prev, { id: Date.now() + Math.random(), projectId: projects[0]?.Project_ID || "PRJ-MAKER", category: taskCategories[0] || "BD & Client Proposals", taskCode: tasks[0]?.Task_Code || "TSK-PROP", title: "", deadline: todayStr }]);
   };
 
   const handleRemoveDraftRow = (id) => {
@@ -1063,33 +758,30 @@ export default function App() {
     }));
   };
 
-  const handleCommitBatchToBucket = async (e) => {
+  const handleCommitBatchToBucket = (e) => {
     e.preventDefault();
     const validRows = draftRows.filter(r => r.title.trim() !== "");
     if (validRows.length === 0) return;
 
     setIsAddingBatch(true);
     const assignees = selectedCollaborators.length > 0 ? selectedCollaborators : [activeEmployeeEmail];
-    const originTag = viewRole === "company" ? "Company Lead" : "Self";
-    const collabString = assignees.join(", ");
-
     const createdItems = [];
     validRows.forEach(row => {
       assignees.forEach(email => {
         createdItems.push({
           Pulse_ID: "TSK-" + Date.now() + "-" + Math.floor(Math.random() * 10000),
           Created_Date: todayStr,
-          Emp_Email: email.toLowerCase().trim(),
+          Emp_Email: (email || "").toLowerCase().trim(),
           Project_ID: row.projectId,
           Task_Code: row.taskCode,
           Monday_Commitment: row.title.trim(),
           Auto_Task_Hours: 0,
           Auto_Learning_Hours: 0,
-          Friday_Outcome: originTag,
+          Friday_Outcome: viewRole === "company" ? "Company Lead" : "Self",
           Status: "In Progress",
           Target_Deadline: row.deadline || todayStr,
           Completed_Date: "",
-          Collaborators: collabString
+          Collaborators: assignees.join(", ")
         });
       });
     });
@@ -1097,16 +789,8 @@ export default function App() {
     setWeeklyPulses(prev => [...prev, ...createdItems]);
     setDraftRows([{ id: Date.now(), projectId: projects[0]?.Project_ID || "PRJ-MAKER", category: taskCategories[0] || "BD & Client Proposals", taskCode: tasks[0]?.Task_Code || "TSK-PROP", title: "", deadline: todayStr }]);
     setShowManualForm(false);
-    showToast(`Added ${validRows.length} deliverable(s) to bucket!`);
-
-    try {
-      fetch(APPS_SCRIPT_URL, {
-        method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({ action: "addWorkboardBatch", items: createdItems })
-      });
-    } catch (err) {} finally {
-      setIsAddingBatch(false);
-    }
+    showToast(`Added ${validRows.length} deliverable(s)!`);
+    setIsAddingBatch(false);
   };
 
   const handleOpenLogModal = (item) => {
@@ -1119,28 +803,20 @@ export default function App() {
     setSessionNotes("");
   };
 
-  const handleSaveTaskSession = async (e) => {
+  const handleSaveTaskSession = (e) => {
     e.preventDefault();
     if (!activeLoggingItem) return;
     setIsSubmittingSession(true);
 
     const sessionMinutes = (sessionSliderHours * 60) + sessionSliderMins;
-    const lrnMins = sessionLearningModule !== "None" ? Number(sessionLearningMins) : 0;
-
     setWeeklyPulses(prev => prev.map(p => {
       if (p.Pulse_ID === activeLoggingItem.Pulse_ID) {
-        return {
-          ...p,
-          Auto_Task_Hours: sessionProgress,
-          Auto_Learning_Hours: Number(p.Auto_Learning_Hours || 0) + sessionMinutes,
-          Status: sessionProgress >= 100 ? "Completed" : "In Progress",
-          Completed_Date: sessionProgress >= 100 ? todayStr : ""
-        };
+        return { ...p, Auto_Task_Hours: sessionProgress, Auto_Learning_Hours: Number(p.Auto_Learning_Hours || 0) + sessionMinutes, Status: sessionProgress >= 100 ? "Completed" : "In Progress", Completed_Date: sessionProgress >= 100 ? todayStr : "" };
       }
       return p;
     }));
 
-    const newLog = {
+    setDailyLogs(prev => [...prev, {
       Log_ID: "LOG-" + Date.now(),
       Date: todayStr,
       Emp_Email: activeEmployeeEmail,
@@ -1148,45 +824,23 @@ export default function App() {
       Task_Code: activeLoggingItem.Task_Code,
       Task_Hours: sessionMinutes,
       Learning_Module_Code: sessionLearningModule,
-      Learning_Hours: lrnMins,
+      Learning_Hours: sessionLearningModule !== "None" ? Number(sessionLearningMins) : 0,
       Status: sessionProgress >= 100 ? "Done" : "In Progress",
       Streak_Count: currentStreak || 1,
       Notes: sessionNotes
-    };
+    }]);
 
-    setDailyLogs(prev => [...prev, newLog]);
-    showToast(`Logged ${sessionMinutes}m on "${activeLoggingItem.Monday_Commitment}"!`);
+    showToast(`Logged ${sessionMinutes}m session!`);
     setActiveLoggingItem(null);
-
-    try {
-      fetch(APPS_SCRIPT_URL, {
-        method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({
-          action: "logTaskSession",
-          pulseId: activeLoggingItem.Pulse_ID,
-          email: activeEmployeeEmail,
-          projectId: activeLoggingItem.Project_ID,
-          taskCode: activeLoggingItem.Task_Code,
-          taskMinutes: sessionMinutes,
-          learningModuleCode: sessionLearningModule,
-          learningMinutes: lrnMins,
-          progressPercent: sessionProgress,
-          currentStreak: currentStreak || 1,
-          status: sessionProgress >= 100 ? "Done" : "In Progress",
-          notes: sessionNotes
-        })
-      });
-    } catch (err) {} finally {
-      setIsSubmittingSession(false);
-    }
+    setIsSubmittingSession(false);
   };
 
-  const handleSaveStandaloneLearning = async (e) => {
+  const handleSaveStandaloneLearning = (e) => {
     e.preventDefault();
     const totalMins = (Number(standaloneHours) * 60) + Number(standaloneMins);
     if (totalMins === 0) return;
 
-    const newLog = {
+    setDailyLogs(prev => [...prev, {
       Log_ID: "LRN-" + Date.now(),
       Date: todayStr,
       Emp_Email: activeEmployeeEmail,
@@ -1198,109 +852,75 @@ export default function App() {
       Status: "Done",
       Streak_Count: currentStreak || 1,
       Notes: standaloneNotes || "Deliberate upskilling session"
-    };
+    }]);
 
-    setDailyLogs(prev => [...prev, newLog]);
-    showToast(`Logged ${totalMins}m of deliberate learning!`);
+    showToast(`Logged ${totalMins}m learning!`);
     setShowStandaloneLearning(false);
     setStandaloneNotes("");
-
-    try {
-      fetch(APPS_SCRIPT_URL, {
-        method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({
-          action: "logStandaloneLearning",
-          email: activeEmployeeEmail,
-          learningModuleCode: standaloneModule,
-          learningMinutes: totalMins,
-          currentStreak: currentStreak || 1,
-          notes: standaloneNotes
-        })
-      });
-    } catch (err) {}
   };
 
-  const handleSaveRnR = async () => {
+  const handleSaveRnR = () => {
     setIsSavingRnR(true);
-    setEmployees(prev => prev.map(e => {
-      if ((e.Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase()) {
-        return { ...e, "R&R_Summary": rnrDraft };
-      }
-      return e;
-    }));
-    showToast("Roles & Responsibilities updated!");
+    setEmployees(prev => prev.map(e => (e.Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase() ? { ...e, "R&R_Summary": rnrDraft } : e));
+    showToast("R&R updated!");
     setIsEditingRnR(false);
-
-    try {
-      fetch(APPS_SCRIPT_URL, {
-        method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({ action: "updateEmployeeRnR", email: activeEmployeeEmail, rnrSummary: rnrDraft })
-      });
-    } catch (err) {} finally {
-      setIsSavingRnR(false);
-    }
+    setIsSavingRnR(false);
   };
 
-  const handleSeedCatalogToSheet = async () => {
-    showToast("Syncing master catalog to Google Sheet...");
-    try {
-      fetch(APPS_SCRIPT_URL, {
-        method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({ action: "seedDefaultCatalog", projects, tasks, learningModules })
-      });
-    } catch (err) {}
-  };
+  const isDark = theme === "dark";
 
   return (
-    <div className={`min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans pb-20 md:pb-8 ${forceMobilePreview ? "max-w-md mx-auto border-x border-slate-200 shadow-2xl" : ""}`}>
-      {/* Minimalist White Top Header */}
-      <header className="border-b border-slate-200 bg-white/90 backdrop-blur sticky top-0 z-40">
+    <div className={`min-h-screen flex flex-col font-sans pb-20 md:pb-8 transition-colors duration-200 ${isDark ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-950"} ${forceMobilePreview ? "max-w-md mx-auto border-x shadow-2xl " + (isDark ? "border-slate-800" : "border-slate-200") : ""}`}>
+      
+      {/* Top Header */}
+      <header className={`border-b sticky top-0 z-40 backdrop-blur transition-colors ${isDark ? "border-slate-800 bg-slate-900/90" : "border-slate-200 bg-white/90"}`}>
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-sm">
               <Sparkles className="h-4 w-4 text-white" />
             </div>
             <div>
-              <span className="font-bold text-base tracking-tight text-slate-900">IE Goal Tracker</span>
-              {!isCompactMobile && <span className="text-[11px] text-slate-500 block">Multi-Task Voice & Focus OS</span>}
+              <span className="font-bold text-base tracking-tight">IE Goal Tracker</span>
+              {!isCompactMobile && <span className={`text-[11px] ${isDark ? "text-slate-400" : "text-slate-500"} block`}>Multi-Task Voice & Focus OS</span>}
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Theme Toggle Button */}
+            <button
+              onClick={() => setTheme(isDark ? "light" : "dark")}
+              title="Toggle Light/Dark Theme"
+              className={`p-1.5 rounded-lg border transition ${isDark ? "bg-slate-800 border-slate-700 text-amber-400" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"}`}
+            >
+              {isDark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+            </button>
+
             {!isMobileScreen && (
               <button
                 onClick={() => setForceMobilePreview(!forceMobilePreview)}
                 title="Toggle Mobile Minimal View"
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1 transition ${forceMobilePreview ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1 transition ${forceMobilePreview ? "bg-indigo-50 text-indigo-700 border-indigo-200" : isDark ? "bg-slate-800 text-slate-300 border-slate-700" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
               >
                 {forceMobilePreview ? <Monitor className="h-3.5 w-3.5" /> : <Smartphone className="h-3.5 w-3.5" />}
                 <span>{forceMobilePreview ? "Full Web" : "Mobile View"}</span>
               </button>
             )}
 
-            <button
-              onClick={() => setShowApiKeyModal(true)}
-              title="Optional Gemini AI Key"
-              className={`p-1.5 rounded-lg border transition ${geminiApiKey ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-white border-slate-200 text-slate-500 hover:text-slate-800"}`}
-            >
-              <Key className="h-3.5 w-3.5" />
-            </button>
-
-            <button onClick={fetchSheetData} title="Sync with Sheet" className="p-1.5 text-slate-500 hover:text-slate-900 rounded-lg border border-slate-200 bg-white">
+            <button onClick={fetchSheetData} title="Sync with Sheet" className={`p-1.5 rounded-lg border ${isDark ? "bg-slate-800 border-slate-700 text-slate-300" : "bg-white border-slate-200 text-slate-500"}`}>
               <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin text-indigo-600' : ''}`} />
             </button>
 
             {!isCompactMobile && (
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
+              <div className={`flex items-center p-0.5 rounded-lg border text-xs ${isDark ? "bg-slate-800 border-slate-700" : "bg-slate-100 border-slate-200"}`}>
                 <button
                   onClick={() => setViewRole("employee")}
-                  className={`px-2.5 py-1 rounded-md transition ${viewRole === "employee" ? "bg-white text-slate-900 font-semibold shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+                  className={`px-2.5 py-1 rounded-md transition ${viewRole === "employee" ? (isDark ? "bg-slate-900 text-white font-semibold shadow-sm" : "bg-white text-slate-900 font-semibold shadow-sm") : "text-slate-400 hover:text-white"}`}
                 >
                   My Cockpit
                 </button>
                 <button
                   onClick={() => setViewRole("company")}
-                  className={`px-2.5 py-1 rounded-md transition flex items-center gap-1 ${viewRole === "company" ? "bg-white text-slate-900 font-semibold shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+                  className={`px-2.5 py-1 rounded-md transition flex items-center gap-1 ${viewRole === "company" ? (isDark ? "bg-slate-900 text-white font-semibold shadow-sm" : "bg-white text-slate-900 font-semibold shadow-sm") : "text-slate-400 hover:text-white"}`}
                 >
                   <Building2 className="h-3 w-3" /> Company View
                 </button>
@@ -1314,7 +934,7 @@ export default function App() {
                   setActiveEmployeeEmail(e.target.value);
                   setSelectedCollaborators([e.target.value]);
                 }}
-                className="bg-white border border-slate-200 text-slate-800 text-xs font-medium px-2 py-1.5 rounded-lg focus:outline-none"
+                className={`text-xs font-medium px-2 py-1.5 rounded-lg focus:outline-none border ${isDark ? "bg-slate-900 border-slate-700 text-slate-200" : "bg-white border-slate-200 text-slate-800"}`}
               >
                 {employees.map(emp => (
                   <option key={emp.Email} value={emp.Email}>{emp.Name}</option>
@@ -1325,20 +945,20 @@ export default function App() {
         </div>
       </header>
 
-      {/* Clean Light Mission Orbit Bar */}
-      <div className="bg-white border-b border-slate-200 py-2 px-4">
+      {/* Mission Orbit Bar */}
+      <div className={`border-b py-2 px-4 transition-colors ${isDark ? "bg-slate-900/80 border-slate-800" : "bg-white border-slate-200"}`}>
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2 truncate">
-            <Rocket className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
-            <span className="font-semibold text-slate-800">Mission Orbit:</span>
-            <span className="font-mono font-bold text-indigo-600">{collectiveOrbit.pooledPoints} GP</span>
-            {!isCompactMobile && <span className="text-slate-500">• {collectiveOrbit.currentTier} ({collectiveOrbit.completedTasks} shipped)</span>}
+            <Rocket className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+            <span className={`font-semibold ${isDark ? "text-slate-200" : "text-slate-800"}`}>Mission Orbit:</span>
+            <span className="font-mono font-bold text-indigo-500">{collectiveOrbit.pooledPoints} GP</span>
+            {!isCompactMobile && <span className={isDark ? "text-slate-400" : "text-slate-500"}>• {collectiveOrbit.currentTier} ({collectiveOrbit.completedTasks} shipped)</span>}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <div className="w-28 sm:w-44 bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200">
+            <div className={`w-28 sm:w-44 h-2 rounded-full overflow-hidden border ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"}`}>
               <div className="bg-indigo-600 h-full transition-all duration-500" style={{ width: `${collectiveOrbit.progressPercent}%` }} />
             </div>
-            <span className="font-mono font-semibold text-slate-700">{collectiveOrbit.progressPercent}%</span>
+            <span className={`font-mono font-semibold ${isDark ? "text-slate-300" : "text-slate-700"}`}>{collectiveOrbit.progressPercent}%</span>
           </div>
         </div>
       </div>
@@ -1352,18 +972,18 @@ export default function App() {
 
       {/* ================= MULTI-TASK VOICE & TEXT SMART COMMAND BAR ================= */}
       <div className="max-w-6xl mx-auto px-4 pt-5 w-full">
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-sm">
+        <div className={`border rounded-2xl p-3 sm:p-4 shadow-sm transition-colors ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200/90"}`}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600 flex items-center gap-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-indigo-500 flex items-center gap-1.5">
               <Wand2 className="h-3.5 w-3.5" /> Multi-Task Voice & Text Command Bar
-              <span className="text-slate-400 font-normal hidden sm:inline">
-                — Speak 2 or 3 tasks together; system splits, matches or auto-mints codes for 1-click approval
+              <span className={`font-normal hidden sm:inline ${isDark ? "text-slate-400" : "text-slate-400"}`}>
+                — Speak 2 or 3 tasks together; system splits and previews for approval
               </span>
             </span>
             <button
               type="button"
               onClick={() => setShowManualForm(!showManualForm)}
-              className="text-[11px] text-slate-500 hover:text-slate-900 font-medium underline"
+              className={`text-[11px] font-medium underline ${isDark ? "text-slate-400 hover:text-white" : "text-slate-500 hover:text-slate-900"}`}
             >
               {showManualForm ? "Hide manual form" : "Use manual dropdowns"}
             </button>
@@ -1373,11 +993,11 @@ export default function App() {
             <button
               type="button"
               onClick={handleToggleVoice}
-              title={isListening ? "Stop listening" : "Speak one or multiple tasks"}
+              title="Speak one or multiple tasks"
               className={`p-2.5 rounded-xl border transition shrink-0 flex items-center justify-center ${
                 isListening 
                   ? "bg-rose-500 text-white border-rose-600 animate-pulse shadow-md" 
-                  : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
+                  : isDark ? "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700" : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
               }`}
             >
               {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
@@ -1387,12 +1007,12 @@ export default function App() {
               type="text"
               value={smartInput}
               onChange={(e) => setSmartInput(e.target.value)}
-              placeholder={
-                isCompactMobile
-                  ? 'Say "2h on AMT Expo and then 45m on Dexter BOM"...'
-                  : 'Speak multiple tasks: e.g. "2h on AMT School Expo, and then 45m on Dexter BOM, also add CSR proposal"'
-              }
-              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-indigo-500 focus:outline-none transition"
+              placeholder='Speak or type: e.g. "2h on AMT School Expo, and then 45m on Dexter BOM"'
+              className={`flex-1 border rounded-xl px-3.5 py-2.5 text-xs sm:text-sm focus:outline-none transition ${
+                isDark 
+                  ? "bg-slate-950 border-slate-800 text-white placeholder:text-slate-600 focus:border-indigo-500" 
+                  : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-indigo-500"
+              }`}
             />
 
             <button
@@ -1405,12 +1025,12 @@ export default function App() {
             </button>
           </form>
 
-          {/* Multi-Task Split Preview Cards (Editable + 1-Click Approve All) */}
+          {/* Split Preview Cards */}
           {parsedPreviews.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-slate-100 space-y-2.5">
+            <div className={`mt-3 pt-3 border-t space-y-2.5 ${isDark ? "border-slate-800" : "border-slate-100"}`}>
               <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-slate-800">
-                  Split into {parsedPreviews.length} Ready-to-Approve Task(s) ({parsedPreviews[0]?.engine}):
+                <span className={`font-semibold ${isDark ? "text-slate-200" : "text-slate-800"}`}>
+                  Split into {parsedPreviews.length} Ready-to-Approve Task(s):
                 </span>
                 <button onClick={() => setParsedPreviews([])} className="text-slate-400 hover:text-slate-600">
                   Clear All
@@ -1419,13 +1039,12 @@ export default function App() {
 
               <div className="space-y-2">
                 {parsedPreviews.map((item, idx) => (
-                  <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                  <div key={item.id} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl border text-xs ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200"}`}>
                     <div className="flex flex-wrap items-center gap-1.5 flex-1">
-                      <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">
+                      <span className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded ${isDark ? "bg-slate-800 text-slate-300" : "bg-slate-200 text-slate-700"}`}>
                         #{idx + 1}
                       </span>
 
-                      {/* Action Type Selector */}
                       <select
                         value={item.intent}
                         onChange={(e) => {
@@ -1434,96 +1053,63 @@ export default function App() {
                         }}
                         className={`font-bold px-2 py-1 rounded-md border text-[11px] ${
                           item.intent === "LOG_TIME" 
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
                             : item.intent === "LOG_LEARNING"
-                            ? "bg-purple-50 text-purple-700 border-purple-200"
-                            : "bg-blue-50 text-blue-700 border-blue-200"
+                            ? "bg-purple-500/10 text-purple-400 border-purple-500/30"
+                            : "bg-blue-500/10 text-blue-400 border-blue-500/30"
                         }`}
                       >
-                        <option value="ADD_TASK">+ Add to Bucket</option>
-                        <option value="LOG_TIME">✓ Log Time Spent</option>
-                        <option value="LOG_LEARNING">🎓 Log Learning</option>
+                        <option value="ADD_TASK" className={isDark ? "bg-slate-900" : ""}>+ Add to Bucket</option>
+                        <option value="LOG_TIME" className={isDark ? "bg-slate-900" : ""}>✓ Log Time Spent</option>
+                        <option value="LOG_LEARNING" className={isDark ? "bg-slate-900" : ""}>🎓 Log Learning</option>
                       </select>
 
-                      {/* Project Selector */}
                       <select
                         value={item.projectId}
                         onChange={(e) => setParsedPreviews(prev => prev.map((p, i) => i === idx ? { ...p, projectId: e.target.value } : p))}
-                        className="bg-white border border-slate-200 text-slate-800 font-mono text-[11px] px-2 py-1 rounded-md"
+                        className={`font-mono text-[11px] px-2 py-1 rounded-md border ${isDark ? "bg-slate-900 border-slate-700 text-slate-200" : "bg-white border-slate-200 text-slate-800"}`}
                       >
                         {projects.map(prj => <option key={prj.Project_ID} value={prj.Project_ID}>{prj.Project_ID}</option>)}
                       </select>
 
-                      {/* Task Selector (Shows Auto-Minted New Code or Existing Catalog + Learns Synonym if Reassigned) */}
                       <select
                         value={item.taskCode}
                         onChange={(e) => {
                           const chosenCode = e.target.value;
                           if (item.triggerToken) {
-                            setLearnedAliases(prev => ({
-                              ...prev,
-                              [chosenCode]: Array.from(new Set([...(prev[chosenCode] || []), item.triggerToken]))
-                            }));
+                            setLearnedAliases(prev => ({ ...prev, [chosenCode]: Array.from(new Set([...(prev[chosenCode] || []), item.triggerToken])) }));
                           }
                           setParsedPreviews(prev => prev.map((p, i) => i === idx ? { ...p, taskCode: chosenCode, isNewTask: false } : p));
                         }}
-                        className={`font-mono text-[11px] px-2 py-1 rounded-md border ${
-                          item.isNewTask ? "bg-amber-50 text-amber-800 border-amber-300 font-bold" : "bg-white border-slate-200 text-slate-800"
-                        }`}
+                        className={`font-mono text-[11px] px-2 py-1 rounded-md border ${item.isNewTask ? "bg-amber-500/10 text-amber-300 border-amber-500/30 font-bold" : isDark ? "bg-slate-900 border-slate-700 text-slate-200" : "bg-white border-slate-200 text-slate-800"}`}
                       >
-                        {item.isNewTask && (
-                          <option value={item.taskCode}>✨ NEW: {item.taskCode} ({item.newTaskTitle})</option>
-                        )}
-                        {tasks.map(t => (
-                          <option key={t.Task_Code} value={t.Task_Code}>{t.Task_Code} ({t.Task_Title.slice(0, 20)})</option>
-                        ))}
+                        {item.isNewTask && <option value={item.taskCode}>✨ NEW: {item.taskCode} ({item.newTaskTitle})</option>}
+                        {tasks.map(t => <option key={t.Task_Code} value={t.Task_Code}>{t.Task_Code} ({t.Task_Title.slice(0, 20)})</option>)}
                       </select>
 
-                      {/* Editable Deliverable Title */}
                       <input
                         type="text"
                         value={item.title}
                         onChange={(e) => setParsedPreviews(prev => prev.map((p, i) => i === idx ? { ...p, title: e.target.value } : p))}
-                        className="flex-1 min-w-[150px] bg-white border border-slate-200 rounded-md px-2 py-1 text-slate-900 font-medium"
+                        className={`flex-1 min-w-[150px] border rounded-md px-2 py-1 font-medium ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-200 text-slate-900"}`}
                       />
                     </div>
 
-                    {/* Duration, Progress & Remove Item */}
                     <div className="flex items-center gap-1.5 self-end sm:self-center">
                       {item.intent !== "ADD_TASK" && (
-                        <div className="flex items-center gap-1 bg-white border border-slate-200 px-2 py-1 rounded-md">
+                        <div className={`flex items-center gap-1 border px-2 py-1 rounded-md ${isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"}`}>
                           <Clock className="h-3 w-3 text-amber-500" />
-                          <input
-                            type="number"
-                            min="5"
-                            step="5"
-                            value={item.minutes}
-                            onChange={(e) => setParsedPreviews(prev => prev.map((p, i) => i === idx ? { ...p, minutes: Number(e.target.value) } : p))}
-                            className="w-11 text-right font-mono font-bold text-slate-800 focus:outline-none"
-                          />
+                          <input type="number" min="5" step="5" value={item.minutes} onChange={(e) => setParsedPreviews(prev => prev.map((p, i) => i === idx ? { ...p, minutes: Number(e.target.value) } : p))} className={`w-11 text-right font-mono font-bold focus:outline-none ${isDark ? "bg-transparent text-white" : "text-slate-800"}`} />
                           <span className="text-[10px] text-slate-400">m</span>
                         </div>
                       )}
                       {item.intent === "LOG_TIME" && (
-                        <div className="flex items-center gap-1 bg-white border border-slate-200 px-2 py-1 rounded-md">
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="10"
-                            value={item.progress}
-                            onChange={(e) => setParsedPreviews(prev => prev.map((p, i) => i === idx ? { ...p, progress: Number(e.target.value) } : p))}
-                            className="w-9 text-right font-mono font-bold text-emerald-600 focus:outline-none"
-                          />
+                        <div className={`flex items-center gap-1 border px-2 py-1 rounded-md ${isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"}`}>
+                          <input type="number" min="0" max="100" step="10" value={item.progress} onChange={(e) => setParsedPreviews(prev => prev.map((p, i) => i === idx ? { ...p, progress: Number(e.target.value) } : p))} className={`w-9 text-right font-mono font-bold text-emerald-400 focus:outline-none ${isDark ? "bg-transparent" : ""}`} />
                           <span className="text-[10px] text-slate-400">%</span>
                         </div>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => setParsedPreviews(prev => prev.filter((_, i) => i !== idx))}
-                        className="p-1 text-slate-400 hover:text-rose-500"
-                        title="Remove this split task"
-                      >
+                      <button type="button" onClick={() => setParsedPreviews(prev => prev.filter((_, i) => i !== idx))} className="p-1 text-slate-400 hover:text-rose-400">
                         <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -1532,85 +1118,57 @@ export default function App() {
               </div>
 
               <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleConfirmSmartPreviews}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-xs flex items-center gap-1.5 shadow-sm"
-                >
+                <button type="button" onClick={handleConfirmSmartPreviews} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-xs flex items-center gap-1.5 shadow-sm">
                   <Check className="h-3.5 w-3.5" /> Approve & Save All ({parsedPreviews.length})
                 </button>
               </div>
             </div>
           )}
 
-          {/* Collapsible Manual Multi-Row Form */}
           {showManualForm && (
-            <form onSubmit={handleCommitBatchToBucket} className="mt-4 pt-4 border-t border-slate-200 space-y-3">
+            <form onSubmit={handleCommitBatchToBucket} className={`mt-4 pt-4 border-t space-y-3 ${isDark ? "border-slate-800" : "border-slate-200"}`}>
               <div className="flex justify-between items-center">
-                <span className="text-xs font-semibold text-slate-700">Manual Multi-Row Task Builder</span>
-                <button type="button" onClick={handleAddDraftRow} className="text-xs text-indigo-600 font-medium">+ Add Row</button>
+                <span className={`text-xs font-semibold ${isDark ? "text-slate-300" : "text-slate-700"}`}>Manual Multi-Row Task Builder</span>
+                <button type="button" onClick={handleAddDraftRow} className="text-xs text-indigo-500 font-medium">+ Add Row</button>
               </div>
               {draftRows.map((row) => {
                 const filteredTasks = tasks.filter(t => t.Category === row.category);
                 return (
-                  <div key={row.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 items-end">
+                  <div key={row.id} className={`grid grid-cols-1 sm:grid-cols-12 gap-2 p-2.5 rounded-xl border items-end ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200"}`}>
                     <div className="sm:col-span-2">
-                      <label className="text-[10px] text-slate-500 block mb-0.5">Project</label>
-                      <select value={row.projectId} onChange={e => handleUpdateDraftRow(row.id, "projectId", e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-xs">
+                      <label className="text-[10px] text-slate-400 block mb-0.5">Project</label>
+                      <select value={row.projectId} onChange={e => handleUpdateDraftRow(row.id, "projectId", e.target.value)} className={`w-full rounded-lg p-1.5 text-xs ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-200"}`}>
                         {projects.map(p => <option key={p.Project_ID} value={p.Project_ID}>{p.Project_Name}</option>)}
                       </select>
                     </div>
                     <div className="sm:col-span-3">
-                      <label className="text-[10px] text-slate-500 block mb-0.5">Category</label>
-                      <select value={row.category} onChange={e => handleUpdateDraftRow(row.id, "category", e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-xs">
+                      <label className="text-[10px] text-slate-400 block mb-0.5">Category</label>
+                      <select value={row.category} onChange={e => handleUpdateDraftRow(row.id, "category", e.target.value)} className={`w-full rounded-lg p-1.5 text-xs ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-200"}`}>
                         {taskCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                       </select>
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="text-[10px] text-slate-500 block mb-0.5">Task Code</label>
-                      <select value={row.taskCode} onChange={e => handleUpdateDraftRow(row.id, "taskCode", e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-xs">
+                      <label className="text-[10px] text-slate-400 block mb-0.5">Task Code</label>
+                      <select value={row.taskCode} onChange={e => handleUpdateDraftRow(row.id, "taskCode", e.target.value)} className={`w-full rounded-lg p-1.5 text-xs ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-200"}`}>
                         {(filteredTasks.length > 0 ? filteredTasks : tasks).map(t => (
                           <option key={t.Task_Code} value={t.Task_Code}>[{t.Task_Code}] {t.Task_Title}</option>
                         ))}
                       </select>
                     </div>
                     <div className="sm:col-span-3">
-                      <label className="text-[10px] text-slate-500 block mb-0.5">Deliverable / Client</label>
-                      <input type="text" required value={row.title} onChange={e => handleUpdateDraftRow(row.id, "title", e.target.value)} placeholder="e.g. AMT School Expo" className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-xs" />
+                      <label className="text-[10px] text-slate-400 block mb-0.5">Deliverable / Client</label>
+                      <input type="text" required value={row.title} onChange={e => handleUpdateDraftRow(row.id, "title", e.target.value)} placeholder="e.g. AMT School Expo" className={`w-full rounded-lg p-1.5 text-xs ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-200"}`} />
                     </div>
                     <div className="sm:col-span-2 flex items-center gap-1">
-                      <input type="date" value={row.deadline} onChange={e => handleUpdateDraftRow(row.id, "deadline", e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-xs" />
+                      <input type="date" value={row.deadline} onChange={e => handleUpdateDraftRow(row.id, "deadline", e.target.value)} className={`w-full rounded-lg p-1.5 text-xs ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-200"}`} />
                       {draftRows.length > 1 && (
-                        <button type="button" onClick={() => handleRemoveDraftRow(row.id)} className="p-1 text-rose-500"><Trash2 className="h-3.5 w-3.5" /></button>
+                        <button type="button" onClick={() => handleRemoveDraftRow(row.id)} className="p-1 text-rose-400"><Trash2 className="h-3.5 w-3.5" /></button>
                       )}
                     </div>
                   </div>
                 );
               })}
-
-              {employees.length > 1 && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[11px] text-slate-500">Collaborators:</span>
-                  {employees.map(emp => {
-                    const isSelected = selectedCollaborators.includes(emp.Email);
-                    return (
-                      <button
-                        key={emp.Email}
-                        type="button"
-                        onClick={() => {
-                          if (isSelected && selectedCollaborators.length > 1) setSelectedCollaborators(selectedCollaborators.filter(e => e !== emp.Email));
-                          else if (!isSelected) setSelectedCollaborators([...selectedCollaborators, emp.Email]);
-                        }}
-                        className={`px-2.5 py-0.5 rounded-full text-xs border ${isSelected ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-600 border-slate-200"}`}
-                      >
-                        {emp.Name}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              <button type="submit" disabled={isAddingBatch} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-2 rounded-xl text-xs">
+              <button type="submit" disabled={isAddingBatch} className={`w-full font-medium py-2 rounded-xl text-xs ${isDark ? "bg-slate-800 text-white hover:bg-slate-700" : "bg-slate-900 text-white hover:bg-slate-800"}`}>
                 {isAddingBatch ? "Saving..." : "Commit Manual Rows to Bucket"}
               </button>
             </form>
@@ -1621,20 +1179,19 @@ export default function App() {
       {/* Main Content Area */}
       <main className="max-w-6xl mx-auto px-4 py-5 flex-1 w-full">
         {viewRole === "company" ? (
-          /* ================= COMPANY VIEW ================= */
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h1 className="text-xl font-bold text-slate-900">Company View</h1>
-                <p className="text-xs text-slate-500">Transparent team buckets, live execution stream, and cumulative effort analytics</p>
+                <h1 className={`text-xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}>Company View</h1>
+                <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>Transparent team buckets, live execution stream, and cumulative effort analytics</p>
               </div>
               {!isCompactMobile && (
                 <div className="flex items-center gap-2 flex-wrap">
-                  <button onClick={() => setShowPrjModal(true)} className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-medium border border-slate-200 flex items-center gap-1 shadow-sm">
-                    <FolderPlus className="h-3.5 w-3.5 text-indigo-600" /> + Project
+                  <button onClick={() => setShowPrjModal(true)} className={`px-3 py-1.5 rounded-xl text-xs font-medium border flex items-center gap-1 shadow-sm ${isDark ? "bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-800" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"}`}>
+                    <FolderPlus className="h-3.5 w-3.5 text-indigo-500" /> + Project
                   </button>
-                  <button onClick={() => setShowTskModal(true)} className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-medium border border-slate-200 flex items-center gap-1 shadow-sm">
-                    <ListPlus className="h-3.5 w-3.5 text-emerald-600" /> + Task Code
+                  <button onClick={() => setShowTskModal(true)} className={`px-3 py-1.5 rounded-xl text-xs font-medium border flex items-center gap-1 shadow-sm ${isDark ? "bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-800" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"}`}>
+                    <ListPlus className="h-3.5 w-3.5 text-emerald-500" /> + Task Code
                   </button>
                   <button onClick={() => setShowEmpModal(true)} className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shadow-sm">
                     <UserPlus className="h-3.5 w-3.5" /> + Onboard Member
@@ -1643,60 +1200,50 @@ export default function App() {
               )}
             </div>
 
-            <div className="flex border-b border-slate-200 text-xs sm:text-sm gap-5 overflow-x-auto">
-              <button onClick={() => setCompanyTab("workload")} className={`pb-2.5 font-semibold transition flex items-center gap-1.5 shrink-0 ${companyTab === "workload" ? "text-indigo-600 border-b-2 border-indigo-600" : "text-slate-500 hover:text-slate-800"}`}>
+            <div className={`flex border-b text-xs sm:text-sm gap-5 overflow-x-auto ${isDark ? "border-slate-800" : "border-slate-200"}`}>
+              <button onClick={() => setCompanyTab("workload")} className={`pb-2.5 font-semibold transition flex items-center gap-1.5 shrink-0 ${companyTab === "workload" ? "text-indigo-500 border-b-2 border-indigo-500" : "text-slate-400 hover:text-white"}`}>
                 <Users className="h-4 w-4" /> Team Buckets
               </button>
-              <button onClick={() => setCompanyTab("analytics")} className={`pb-2.5 font-semibold transition flex items-center gap-1.5 shrink-0 ${companyTab === "analytics" ? "text-indigo-600 border-b-2 border-indigo-600" : "text-slate-500 hover:text-slate-800"}`}>
+              <button onClick={() => setCompanyTab("analytics")} className={`pb-2.5 font-semibold transition flex items-center gap-1.5 shrink-0 ${companyTab === "analytics" ? "text-indigo-500 border-b-2 border-indigo-500" : "text-slate-400 hover:text-white"}`}>
                 <PieChart className="h-4 w-4" /> Project & Task Hours
               </button>
-              <button onClick={() => setCompanyTab("live")} className={`pb-2.5 font-semibold transition flex items-center gap-1.5 shrink-0 ${companyTab === "live" ? "text-indigo-600 border-b-2 border-indigo-600" : "text-slate-500 hover:text-slate-800"}`}>
+              <button onClick={() => setCompanyTab("live")} className={`pb-2.5 font-semibold transition flex items-center gap-1.5 shrink-0 ${companyTab === "live" ? "text-indigo-500 border-b-2 border-indigo-500" : "text-slate-400 hover:text-white"}`}>
                 <Activity className="h-4 w-4" /> Live Today ({todayLiveLogs.length})
               </button>
-              {!isCompactMobile && (
-                <button onClick={() => setCompanyTab("catalog")} className={`pb-2.5 font-semibold transition flex items-center gap-1.5 shrink-0 ${companyTab === "catalog" ? "text-indigo-600 border-b-2 border-indigo-600" : "text-slate-500 hover:text-slate-800"}`}>
-                  <LayoutGrid className="h-4 w-4" /> Catalog ({tasks.length})
-                </button>
-              )}
             </div>
 
             {companyTab === "workload" && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {employeeWorkloadBuckets.map(b => (
-                  <div key={b.Email} className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
+                  <div key={b.Email} className={`border rounded-2xl p-4 flex flex-col justify-between shadow-sm transition-colors ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
                     <div>
                       <div className="flex justify-between items-start mb-2">
                         <div>
-                          <h3 className="font-bold text-sm text-slate-900">{b.Name}</h3>
-                          <span className="text-xs text-slate-500">{b.Role_Title}</span>
+                          <h3 className={`font-bold text-sm ${isDark ? "text-white" : "text-slate-900"}`}>{b.Name}</h3>
+                          <span className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>{b.Role_Title}</span>
                         </div>
-                        <span className="px-2 py-0.5 rounded-full text-[11px] bg-slate-100 text-slate-700 font-medium">
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-700"}`}>
                           {b.weekLoggedHours}h wk
                         </span>
                       </div>
 
                       <div className="space-y-1.5 my-3 max-h-48 overflow-y-auto pr-1">
-                        {b.activeTasksList.length === 0 && (
-                          <p className="text-xs text-slate-400 italic py-2">No active tasks in bucket.</p>
-                        )}
+                        {b.activeTasksList.length === 0 && <p className="text-xs text-slate-400 italic py-2">No active tasks.</p>}
                         {b.activeTasksList.map(item => (
-                          <div key={item.Pulse_ID} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs">
+                          <div key={item.Pulse_ID} className={`p-2.5 rounded-xl border text-xs ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200/80"}`}>
                             <div className="flex justify-between text-[11px] mb-0.5">
-                              <span className="font-mono text-indigo-600 font-semibold">{item.Project_ID} • {item.Task_Code}</span>
-                              <span className="font-mono font-bold text-slate-700">{item.Auto_Task_Hours || 0}%</span>
+                              <span className="font-mono text-indigo-400 font-semibold">{item.Project_ID} • {item.Task_Code}</span>
+                              <span className="font-mono font-bold text-slate-300">{item.Auto_Task_Hours || 0}%</span>
                             </div>
-                            <div className="text-slate-800 font-medium truncate">{item.Monday_Commitment}</div>
+                            <div className={`font-medium truncate ${isDark ? "text-slate-200" : "text-slate-800"}`}>{item.Monday_Commitment}</div>
                           </div>
                         ))}
                       </div>
                     </div>
 
                     <button
-                      onClick={() => {
-                        setActiveEmployeeEmail(b.Email);
-                        setViewRole("employee");
-                      }}
-                      className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition"
+                      onClick={() => { setActiveEmployeeEmail(b.Email); setViewRole("employee"); }}
+                      className={`w-full py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition ${isDark ? "bg-slate-800 hover:bg-slate-700 text-slate-200" : "bg-slate-100 hover:bg-slate-200 text-slate-700"}`}
                     >
                       View Cockpit <ChevronRight className="h-3.5 w-3.5" />
                     </button>
@@ -1707,22 +1254,22 @@ export default function App() {
 
             {companyTab === "analytics" && (
               <div className="space-y-5">
-                <div className="bg-white border border-slate-200 rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+                <div className={`border rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
                   <select
                     value={selectedCompanyEmp}
                     onChange={e => setSelectedCompanyEmp(e.target.value)}
-                    className="bg-slate-50 border border-slate-200 text-slate-800 text-xs px-3 py-1.5 rounded-lg font-medium"
+                    className={`text-xs px-3 py-1.5 rounded-lg font-medium border ${isDark ? "bg-slate-950 border-slate-800 text-slate-200" : "bg-slate-50 border-slate-200 text-slate-800"}`}
                   >
                     <option value="ALL">All Team Members (Cumulative)</option>
                     {employees.map(e => <option key={e.Email} value={e.Email}>{e.Name}</option>)}
                   </select>
 
-                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs">
+                  <div className={`flex items-center gap-1 p-1 rounded-lg text-xs border ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"}`}>
                     {["WEEK", "MONTH", "ALL"].map(tf => (
                       <button
                         key={tf}
                         onClick={() => setAnalyticsTimeframe(tf)}
-                        className={`px-2.5 py-1 rounded-md transition ${analyticsTimeframe === tf ? "bg-white text-slate-900 font-semibold shadow-sm" : "text-slate-600"}`}
+                        className={`px-2.5 py-1 rounded-md transition ${analyticsTimeframe === tf ? (isDark ? "bg-slate-800 text-white font-semibold" : "bg-white text-slate-900 font-semibold shadow-sm") : "text-slate-400"}`}
                       >
                         {tf === "WEEK" ? "This Week" : tf === "MONTH" ? "Month" : "All-Time"}
                       </button>
@@ -1731,137 +1278,94 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
-                    <h3 className="font-bold text-sm text-slate-900">Hours by Project Pillar</h3>
-                    {companyProjectBreakdown.length === 0 ? (
-                      <p className="text-xs text-slate-400 py-4">No hours logged in this window.</p>
-                    ) : (
-                      companyProjectBreakdown.map(p => (
-                        <div key={p.projectId} className="space-y-1">
-                          <div className="flex justify-between text-xs">
-                            <span className="font-medium text-slate-800">{p.projectName}</span>
-                            <span className="font-mono text-slate-600">{p.hours}h ({p.percentage}%)</span>
-                          </div>
-                          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                            <div className="bg-indigo-600 h-full" style={{ width: `${p.percentage}%` }} />
-                          </div>
+                  <div className={`border rounded-2xl p-5 shadow-sm space-y-3 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+                    <h3 className={`font-bold text-sm ${isDark ? "text-white" : "text-slate-900"}`}>Hours by Project Pillar</h3>
+                    {companyProjectBreakdown.map(p => (
+                      <div key={p.projectId} className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className={`font-medium ${isDark ? "text-slate-300" : "text-slate-800"}`}>{p.projectName}</span>
+                          <span className="font-mono text-slate-400">{p.hours}h ({p.percentage}%)</span>
                         </div>
-                      ))
-                    )}
+                        <div className={`w-full h-2 rounded-full overflow-hidden ${isDark ? "bg-slate-950" : "bg-slate-100"}`}>
+                          <div className="bg-indigo-600 h-full" style={{ width: `${p.percentage}%` }} />
+                        </div>
+                      </div>
+                    ))}
                   </div>
 
-                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
-                    <h3 className="font-bold text-sm text-slate-900">Hours by Task Code</h3>
-                    {companyTaskBreakdown.length === 0 ? (
-                      <p className="text-xs text-slate-400 py-4">No hours logged in this window.</p>
-                    ) : (
-                      companyTaskBreakdown.map(t => (
-                        <div key={t.taskCode} className="space-y-1">
-                          <div className="flex justify-between text-xs">
-                            <span className="font-medium text-slate-800">[{t.taskCode}] {t.taskTitle}</span>
-                            <span className="font-mono text-slate-600">{t.hours}h ({t.percentage}%)</span>
-                          </div>
-                          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                            <div className="bg-emerald-500 h-full" style={{ width: `${t.percentage}%` }} />
-                          </div>
+                  <div className={`border rounded-2xl p-5 shadow-sm space-y-3 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+                    <h3 className={`font-bold text-sm ${isDark ? "text-white" : "text-slate-900"}`}>Hours by Task Code</h3>
+                    {companyTaskBreakdown.map(t => (
+                      <div key={t.taskCode} className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className={`font-medium ${isDark ? "text-slate-300" : "text-slate-800"}`}>[{t.taskCode}] {t.taskTitle}</span>
+                          <span className="font-mono text-slate-400">{t.hours}h ({t.percentage}%)</span>
                         </div>
-                      ))
-                    )}
+                        <div className={`w-full h-2 rounded-full overflow-hidden ${isDark ? "bg-slate-950" : "bg-slate-100"}`}>
+                          <div className="bg-emerald-500 h-full" style={{ width: `${t.percentage}%` }} />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
             )}
 
             {companyTab === "live" && (
-              <div className="bg-white border border-slate-200 rounded-2xl divide-y divide-slate-100 shadow-sm">
+              <div className={`border rounded-2xl divide-y shadow-sm ${isDark ? "bg-slate-900 border-slate-800 divide-slate-800" : "bg-white border-slate-200 divide-slate-100"}`}>
                 {todayLiveLogs.length === 0 ? (
-                  <div className="p-8 text-center text-slate-400 text-xs">No activity logged yet today ({todayStr}).</div>
+                  <div className="p-8 text-center text-slate-400 text-xs">No activity logged yet today.</div>
                 ) : (
                   todayLiveLogs.map(log => (
                     <div key={log.Log_ID} className="p-4 flex items-center justify-between gap-3 text-xs">
                       <div>
-                        <span className="font-bold text-slate-900">{log.Emp_Email}</span>{" "}
-                        <span className="font-mono text-indigo-600 font-semibold">[{log.Project_ID} • {log.Task_Code}]</span>
-                        {log.Notes && <p className="text-slate-600 mt-0.5">"{log.Notes}"</p>}
+                        <span className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}>{log.Emp_Email}</span>{" "}
+                        <span className="font-mono text-indigo-400 font-semibold">[{log.Project_ID} • {log.Task_Code}]</span>
+                        {log.Notes && <p className={`mt-0.5 ${isDark ? "text-slate-400" : "text-slate-600"}`}>"{log.Notes}"</p>}
                       </div>
-                      <span className="font-mono font-bold text-slate-800 shrink-0">
-                        {Number(log.Task_Hours || 0) + Number(log.Learning_Hours || 0)}m
-                      </span>
+                      <span className="font-mono font-bold text-amber-400 shrink-0">{Number(log.Task_Hours || 0) + Number(log.Learning_Hours || 0)}m</span>
                     </div>
                   ))
                 )}
-              </div>
-            )}
-
-            {companyTab === "catalog" && (
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                  <div>
-                    <h3 className="font-bold text-sm text-slate-900">Active Task Catalog & Auto-Minted Codes ({tasks.length})</h3>
-                    <p className="text-xs text-slate-500">Includes pre-populated tasks plus any new codes auto-created via Voice/Text</p>
-                  </div>
-                  <button onClick={handleSeedCatalogToSheet} className="px-3.5 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-semibold">
-                    ⚡ Sync Catalog to Sheet
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-96 overflow-y-auto">
-                  {tasks.map(t => (
-                    <div key={t.Task_Code} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs flex justify-between items-center">
-                      <div>
-                        <span className="font-mono font-bold text-indigo-600">[{t.Task_Code}]</span>{" "}
-                        <span className="font-medium text-slate-900">{t.Task_Title}</span>
-                        <span className="block text-[10px] text-slate-500">{t.Category}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
           </div>
         ) : (
           /* ================= EMPLOYEE COCKPIT VIEW ================= */
           <div className="space-y-5">
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center justify-between gap-3 shadow-sm">
+            <div className={`border rounded-2xl p-4 flex items-center justify-between gap-3 shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
               <div className="flex items-center gap-3">
                 <div className="h-11 w-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-lg">
                   {currentEmp.Name ? currentEmp.Name[0] : "I"}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-base font-bold text-slate-900">{currentEmp.Name}</h2>
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    <h2 className={`text-base font-bold ${isDark ? "text-white" : "text-slate-900"}`}>{currentEmp.Name}</h2>
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
                       {currentEmp.Level}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500">{currentEmp.Role_Title}</p>
+                  <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>{currentEmp.Role_Title}</p>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                <div className="bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+                <div className="bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
                   <Flame className="h-4 w-4 text-amber-500 fill-amber-500" />
-                  <span className="text-xs font-bold text-amber-800">{currentStreak}d Streak</span>
+                  <span className="text-xs font-bold text-amber-400">{currentStreak}d Streak</span>
                 </div>
-                {!isCompactMobile && (
-                  <button
-                    onClick={() => setShowStandaloneLearning(true)}
-                    className="px-3 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-semibold flex items-center gap-1.5"
-                  >
-                    <GraduationCap className="h-4 w-4" /> + Log Learning
-                  </button>
-                )}
               </div>
             </div>
 
             {!isCompactMobile && (
-              <div className="flex border-b border-slate-200 text-xs sm:text-sm gap-6">
-                <button onClick={() => setEmployeeTab("workboard")} className={`pb-2.5 font-semibold transition flex items-center gap-1.5 ${employeeTab === "workboard" ? "text-indigo-600 border-b-2 border-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>
+              <div className={`flex border-b text-xs sm:text-sm gap-6 ${isDark ? "border-slate-800" : "border-slate-200"}`}>
+                <button onClick={() => setEmployeeTab("workboard")} className={`pb-2.5 font-semibold transition flex items-center gap-1.5 ${employeeTab === "workboard" ? "text-indigo-500 border-b-2 border-indigo-500" : "text-slate-400 hover:text-white"}`}>
                   <CalendarCheck className="h-4 w-4" /> Active Workboard ({currentWorkboard.length})
                 </button>
-                <button onClick={() => setEmployeeTab("focus")} className={`pb-2.5 font-semibold transition flex items-center gap-1.5 ${employeeTab === "focus" ? "text-indigo-600 border-b-2 border-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>
-                  <BarChart3 className="h-4 w-4" /> My Time & Focus ({personalFocusData.totalCombinedHours}h)
+                <button onClick={() => setEmployeeTab("focus")} className={`pb-2.5 font-semibold transition flex items-center gap-1.5 ${employeeTab === "focus" ? "text-indigo-500 border-b-2 border-indigo-500" : "text-slate-400 hover:text-white"}`}>
+                  <BarChart3 className="h-4 w-4" /> My Time & Focus
                 </button>
-                <button onClick={() => setEmployeeTab("rnr")} className={`pb-2.5 font-semibold transition flex items-center gap-1.5 ${employeeTab === "rnr" ? "text-indigo-600 border-b-2 border-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>
+                <button onClick={() => setEmployeeTab("rnr")} className={`pb-2.5 font-semibold transition flex items-center gap-1.5 ${employeeTab === "rnr" ? "text-indigo-500 border-b-2 border-indigo-500" : "text-slate-400 hover:text-white"}`}>
                   <BookOpen className="h-4 w-4" /> Editable R&R
                 </button>
               </div>
@@ -1870,21 +1374,21 @@ export default function App() {
             {employeeTab === "workboard" && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-slate-600">
-                    Active Bucket ({currentWorkboard.length} tasks • {collectionMetrics.percent}% avg completion)
+                  <span className={`text-xs font-semibold ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+                    Active Bucket ({currentWorkboard.length} tasks • {collectionMetrics.percent}% completed)
                   </span>
                   <input
                     type="text"
                     value={workboardSearch}
                     onChange={e => setWorkboardSearch(e.target.value)}
                     placeholder="Filter tasks..."
-                    className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-800 w-40 sm:w-56 focus:outline-none"
+                    className={`rounded-lg px-2.5 py-1 text-xs w-40 sm:w-56 focus:outline-none border ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-800"}`}
                   />
                 </div>
 
                 {currentWorkboard.length === 0 ? (
-                  <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs">
-                    Your bucket is clear. Speak or type 1, 2, or 3 tasks into the command bar above!
+                  <div className={`p-8 text-center rounded-2xl border text-xs ${isDark ? "bg-slate-900 border-slate-800 text-slate-400" : "bg-white border-slate-200 text-slate-400"}`}>
+                    Your bucket is clear. Speak or type tasks into the command bar above!
                   </div>
                 ) : (
                   <div className={`grid grid-cols-1 ${isCompactMobile ? "" : "md:grid-cols-2"} gap-3.5`}>
@@ -1896,38 +1400,25 @@ export default function App() {
                       const isOverdue = !isDone && deadD && deadD < todayStr;
 
                       return (
-                        <div key={item.Pulse_ID} className={`p-4 rounded-2xl bg-white border transition shadow-sm ${isDone ? "border-emerald-200 bg-emerald-50/20" : isOverdue ? "border-amber-300" : "border-slate-200 hover:border-slate-300"}`}>
+                        <div key={item.Pulse_ID} className={`p-4 rounded-2xl border transition shadow-sm ${isDone ? "border-emerald-500/30 bg-emerald-500/5" : isOverdue ? "border-amber-500/40" : isDark ? "bg-slate-900 border-slate-800 hover:border-slate-700" : "bg-white border-slate-200 hover:border-slate-300"}`}>
                           <div className="flex justify-between items-start gap-2 mb-1.5">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[11px] px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-mono font-semibold border border-indigo-100">
-                                {item.Project_ID} • {item.Task_Code}
-                              </span>
-                              {item.Collaborators && item.Collaborators.includes(",") && (
-                                <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-medium flex items-center gap-1">
-                                  <Users className="h-3 w-3" /> Collab
-                                </span>
-                              )}
-                            </div>
-                            <span className={`text-xs font-mono font-bold ${isDone ? "text-emerald-600" : "text-slate-700"}`}>
+                            <span className="text-[11px] px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 font-mono font-semibold border border-indigo-500/20">
+                              {item.Project_ID} • {item.Task_Code}
+                            </span>
+                            <span className={`text-xs font-mono font-bold ${isDone ? "text-emerald-400" : isDark ? "text-slate-300" : "text-slate-700"}`}>
                               {progress}%
                             </span>
                           </div>
 
-                          <h4 className="font-semibold text-sm text-slate-900 mb-2">{item.Monday_Commitment}</h4>
+                          <h4 className={`font-semibold text-sm mb-2 ${isDark ? "text-white" : "text-slate-900"}`}>{item.Monday_Commitment}</h4>
 
-                          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3">
+                          <div className={`w-full h-1.5 rounded-full overflow-hidden mb-3 ${isDark ? "bg-slate-950" : "bg-slate-100"}`}>
                             <div className={`h-full transition-all duration-300 ${isDone ? "bg-emerald-500" : "bg-indigo-600"}`} style={{ width: `${Math.min(100, progress)}%` }} />
                           </div>
 
                           <div className="flex justify-between items-center text-xs pt-1">
-                            <div className="text-[11px] text-slate-500 flex items-center gap-2">
-                              <span className="font-mono text-slate-700 font-medium">🕒 {(mins / 60).toFixed(1)}h</span>
-                              <span>• Due {deadD || "Rolling"}</span>
-                            </div>
-                            <button
-                              onClick={() => handleOpenLogModal(item)}
-                              className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1 shadow-sm"
-                            >
+                            <span className="font-mono text-slate-400">🕒 {(mins / 60).toFixed(1)}h • Due {deadD || "Rolling"}</span>
+                            <button onClick={() => handleOpenLogModal(item)} className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1 shadow-sm">
                               <Sliders className="h-3 w-3" /> Log Time
                             </button>
                           </div>
@@ -1940,77 +1431,44 @@ export default function App() {
             )}
 
             {employeeTab === "focus" && (
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <div>
-                    <h3 className="font-bold text-sm text-slate-900">Where My Time Went</h3>
-                    <p className="text-xs text-slate-500">
-                      Cumulative Logged: <strong className="text-indigo-600 font-mono">{personalFocusData.totalCombinedHours} hrs</strong> ({personalFocusData.projectHours}h Projects • {personalFocusData.learningHours}h Learning)
-                    </p>
-                  </div>
-                  <div className="flex bg-slate-100 p-0.5 rounded-lg text-xs">
-                    <button onClick={() => setPersonalFocusTimeframe("WEEK")} className={`px-2.5 py-1 rounded-md ${personalFocusTimeframe === "WEEK" ? "bg-white font-semibold shadow-sm" : "text-slate-600"}`}>Week</button>
-                    <button onClick={() => setPersonalFocusTimeframe("MONTH")} className={`px-2.5 py-1 rounded-md ${personalFocusTimeframe === "MONTH" ? "bg-white font-semibold shadow-sm" : "text-slate-600"}`}>Month</button>
-                  </div>
+              <div className={`border rounded-2xl p-5 shadow-sm space-y-4 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+                <h3 className={`font-bold text-sm ${isDark ? "text-white" : "text-slate-900"}`}>Where My Time Went</h3>
+                <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                  Cumulative Logged: <strong className="text-indigo-400 font-mono">{personalFocusData.totalCombinedHours} hrs</strong> ({personalFocusData.projectHours}h Projects • {personalFocusData.learningHours}h Learning)
+                </p>
+                <div className="space-y-2.5">
+                  {personalFocusData.projectBars.map(bar => (
+                    <div key={bar.code} className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className={isDark ? "text-slate-300" : "text-slate-800"}>{bar.name}</span>
+                        <span className="font-mono text-slate-400">{bar.hours}h ({bar.percent}%)</span>
+                      </div>
+                      <div className={`w-full h-2 rounded-full overflow-hidden ${isDark ? "bg-slate-950" : "bg-slate-100"}`}>
+                        <div className="bg-indigo-600 h-full" style={{ width: `${bar.percent}%` }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
-
-                {personalFocusData.totalCombinedMins === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-6">No hours logged yet for this period.</p>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2.5">
-                      <span className="text-xs font-semibold text-slate-500 uppercase">By Project Pillar</span>
-                      {personalFocusData.projectBars.map(bar => (
-                        <div key={bar.code} className="space-y-1">
-                          <div className="flex justify-between text-xs">
-                            <span className="font-medium text-slate-800">{bar.name}</span>
-                            <span className="font-mono text-slate-600">{bar.hours}h ({bar.percent}%)</span>
-                          </div>
-                          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                            <div className="bg-indigo-600 h-full" style={{ width: `${bar.percent}%` }} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="space-y-2.5">
-                      <span className="text-xs font-semibold text-slate-500 uppercase">By Activity Type</span>
-                      {personalFocusData.taskBars.map(bar => (
-                        <div key={bar.code} className="space-y-1">
-                          <div className="flex justify-between text-xs">
-                            <span className="font-medium text-slate-800">[{bar.code}] {bar.name}</span>
-                            <span className="font-mono text-slate-600">{bar.hours}h ({bar.percent}%)</span>
-                          </div>
-                          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                            <div className="bg-emerald-500 h-full" style={{ width: `${bar.percent}%` }} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
             {employeeTab === "rnr" && (
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+              <div className={`border rounded-2xl p-5 shadow-sm space-y-3 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
                 <div className="flex justify-between items-center">
-                  <h4 className="font-bold text-sm text-slate-900">My Roles & Responsibilities</h4>
+                  <h4 className={`font-bold text-sm ${isDark ? "text-white" : "text-slate-900"}`}>My Roles & Responsibilities</h4>
                   {!isEditingRnR ? (
-                    <button onClick={() => setIsEditingRnR(true)} className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs rounded-lg font-medium flex items-center gap-1">
-                      <Edit3 className="h-3.5 w-3.5" /> Edit
-                    </button>
+                    <button onClick={() => setIsEditingRnR(true)} className={`px-3 py-1 text-xs rounded-lg font-medium border ${isDark ? "bg-slate-800 border-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 text-slate-700"}`}>Edit</button>
                   ) : (
                     <div className="flex gap-2">
-                      <button onClick={() => setIsEditingRnR(false)} className="text-xs text-slate-500">Cancel</button>
+                      <button onClick={() => setIsEditingRnR(false)} className="text-xs text-slate-400">Cancel</button>
                       <button onClick={handleSaveRnR} disabled={isSavingRnR} className="px-3 py-1 bg-indigo-600 text-white text-xs rounded-lg font-semibold">Save</button>
                     </div>
                   )}
                 </div>
                 {isEditingRnR ? (
-                  <textarea rows="6" value={rnrDraft} onChange={e => setRnrDraft(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-800" />
+                  <textarea rows="6" value={rnrDraft} onChange={e => setRnrDraft(e.target.value)} className={`w-full rounded-xl p-3 text-sm border focus:outline-none ${isDark ? "bg-slate-950 border-slate-700 text-white" : "bg-slate-50 border-slate-200 text-slate-900"}`} />
                 ) : (
-                  <div className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200/70 whitespace-pre-line">
+                  <div className={`text-sm leading-relaxed p-4 rounded-xl border whitespace-pre-line ${isDark ? "bg-slate-950 border-slate-800 text-slate-300" : "bg-slate-50 border-slate-200 text-slate-700"}`}>
                     {currentEmp["R&R_Summary"]}
                   </div>
                 )}
@@ -2020,152 +1478,102 @@ export default function App() {
         )}
       </main>
 
-      {/* MOBILE BOTTOM NAVIGATION BAR */}
+      {/* Mobile Bottom Navigation */}
       {isCompactMobile && (
-        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 h-14 flex items-center justify-around z-40 max-w-md mx-auto">
-          <button
-            onClick={() => { setViewRole("employee"); setEmployeeTab("workboard"); }}
-            className={`flex flex-col items-center gap-0.5 text-[11px] font-medium ${viewRole === "employee" && employeeTab === "workboard" ? "text-indigo-600" : "text-slate-400"}`}
-          >
-            <CalendarCheck className="h-4 w-4" />
-            <span>Workboard</span>
+        <nav className={`fixed bottom-0 left-0 right-0 border-t h-14 flex items-center justify-around z-40 max-w-md mx-auto transition-colors ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+          <button onClick={() => { setViewRole("employee"); setEmployeeTab("workboard"); }} className={`flex flex-col items-center gap-0.5 text-[11px] font-medium ${viewRole === "employee" && employeeTab === "workboard" ? "text-indigo-500" : "text-slate-400"}`}>
+            <CalendarCheck className="h-4 w-4" /><span>Workboard</span>
           </button>
-          <button
-            onClick={() => { setViewRole("employee"); setEmployeeTab("focus"); }}
-            className={`flex flex-col items-center gap-0.5 text-[11px] font-medium ${viewRole === "employee" && employeeTab === "focus" ? "text-indigo-600" : "text-slate-400"}`}
-          >
-            <BarChart3 className="h-4 w-4" />
-            <span>My Focus</span>
+          <button onClick={() => { setViewRole("employee"); setEmployeeTab("focus"); }} className={`flex flex-col items-center gap-0.5 text-[11px] font-medium ${viewRole === "employee" && employeeTab === "focus" ? "text-indigo-500" : "text-slate-400"}`}>
+            <BarChart3 className="h-4 w-4" /><span>My Focus</span>
           </button>
-          <button
-            onClick={() => setShowStandaloneLearning(true)}
-            className="flex flex-col items-center gap-0.5 text-[11px] font-medium text-purple-600"
-          >
-            <GraduationCap className="h-4 w-4" />
-            <span>+ Learning</span>
+          <button onClick={() => setShowStandaloneLearning(true)} className="flex flex-col items-center gap-0.5 text-[11px] font-medium text-purple-400">
+            <GraduationCap className="h-4 w-4" /><span>+ Learning</span>
           </button>
-          <button
-            onClick={() => setViewRole("company")}
-            className={`flex flex-col items-center gap-0.5 text-[11px] font-medium ${viewRole === "company" ? "text-indigo-600" : "text-slate-400"}`}
-          >
-            <Building2 className="h-4 w-4" />
-            <span>Company</span>
+          <button onClick={() => setViewRole("company")} className={`flex flex-col items-center gap-0.5 text-[11px] font-medium ${viewRole === "company" ? "text-indigo-500" : "text-slate-400"}`}>
+            <Building2 className="h-4 w-4" /><span>Company</span>
           </button>
         </nav>
       )}
 
-      {/* MODAL 1: IN-CARD LOGGING SLIDERS */}
+      {/* Log Session Modal */}
       {activeLoggingItem && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-5 shadow-xl space-y-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`border rounded-2xl max-w-md w-full p-5 shadow-xl space-y-4 ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
             <div className="flex justify-between items-start">
               <div>
-                <span className="text-xs px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-mono font-semibold">
+                <span className="text-xs px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 font-mono font-semibold">
                   {activeLoggingItem.Project_ID} • {activeLoggingItem.Task_Code}
                 </span>
-                <h3 className="text-sm font-bold text-slate-900 mt-1">{activeLoggingItem.Monday_Commitment}</h3>
+                <h3 className="text-sm font-bold mt-1">{activeLoggingItem.Monday_Commitment}</h3>
               </div>
-              <button onClick={() => setActiveLoggingItem(null)} className="text-slate-400 hover:text-slate-700"><X className="h-4 w-4" /></button>
+              <button onClick={() => setActiveLoggingItem(null)} className="text-slate-400"><X className="h-4 w-4" /></button>
             </div>
 
             <form onSubmit={handleSaveTaskSession} className="space-y-4 text-xs">
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
+              <div className={`p-3.5 rounded-xl border space-y-3 ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200"}`}>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-700 font-semibold">Duration:</span>
-                  <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-mono font-bold">
-                    {sessionSliderHours}h {sessionSliderMins}m ({(sessionSliderHours * 60) + sessionSliderMins}m)
+                  <span className="font-semibold">Duration:</span>
+                  <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-mono font-bold">
+                    {sessionSliderHours}h {sessionSliderMins}m
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <span className="text-[11px] text-slate-500 block mb-1">Hours: {sessionSliderHours}h</span>
+                    <span className="text-[11px] text-slate-400 block mb-1">Hours: {sessionSliderHours}h</span>
                     <input type="range" min="0" max="8" step="1" value={sessionSliderHours} onChange={e => setSessionSliderHours(Number(e.target.value))} className="w-full accent-indigo-600" />
                   </div>
                   <div>
-                    <span className="text-[11px] text-slate-500 block mb-1">Minutes: {sessionSliderMins}m</span>
+                    <span className="text-[11px] text-slate-400 block mb-1">Minutes: {sessionSliderMins}m</span>
                     <input type="range" min="0" max="45" step="15" value={sessionSliderMins} onChange={e => setSessionSliderMins(Number(e.target.value))} className="w-full accent-indigo-600" />
                   </div>
                 </div>
               </div>
 
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+              <div className={`p-3.5 rounded-xl border space-y-2 ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200"}`}>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-700 font-semibold">Completion %:</span>
-                  <span className="font-mono font-bold text-emerald-600">{sessionProgress}%</span>
+                  <span className="font-semibold">Completion %:</span>
+                  <span className="font-mono font-bold text-emerald-400">{sessionProgress}%</span>
                 </div>
-                <input type="range" min="0" max="100" step="5" value={sessionProgress} onChange={e => setSessionProgress(Number(e.target.value))} className="w-full accent-emerald-600" />
+                <input type="range" min="0" max="100" step="5" value={sessionProgress} onChange={e => setSessionProgress(Number(e.target.value))} className="w-full accent-emerald-500" />
               </div>
 
               <div>
-                <label className="text-slate-600 block mb-1 font-medium">Notes (Optional)</label>
-                <input type="text" value={sessionNotes} onChange={e => setSessionNotes(e.target.value)} placeholder="What was completed?" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-900" />
+                <label className="block mb-1 font-medium">Notes (Optional)</label>
+                <input type="text" value={sessionNotes} onChange={e => setSessionNotes(e.target.value)} placeholder="What was completed?" className={`w-full rounded-lg p-2 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-900"}`} />
               </div>
 
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setActiveLoggingItem(null)} className="px-3 py-2 text-slate-500">Cancel</button>
-                <button type="submit" disabled={isSubmittingSession} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl">
-                  Save Session
-                </button>
+                <button type="button" onClick={() => setActiveLoggingItem(null)} className="px-3 py-2 text-slate-400">Cancel</button>
+                <button type="submit" disabled={isSubmittingSession} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl">Save Session</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL 2: OPTIONAL GEMINI AI API KEY SETUP */}
-      {showApiKeyModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-5 shadow-xl space-y-3 text-xs">
-            <div className="flex justify-between items-center">
-              <h3 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
-                <Key className="h-4 w-4 text-indigo-600" /> Hybrid AI Engine Settings
-              </h3>
-              <button onClick={() => setShowApiKeyModal(false)} className="text-slate-400"><X className="h-4 w-4" /></button>
-            </div>
-            <p className="text-slate-600 leading-relaxed">
-              The <strong>Smart Multi-Task Local Engine</strong> splits multiple spoken tasks and auto-mints new codes out of the box with zero API keys. Optionally paste a <strong>Gemini API Key</strong> below if you want cloud LLM parsing.
-            </p>
-            <input
-              type="password"
-              value={geminiApiKey}
-              onChange={(e) => {
-                setGeminiApiKey(e.target.value);
-                localStorage.setItem("ie_gemini_api_key", e.target.value);
-              }}
-              placeholder="Paste AIzaSy... Gemini API Key (Optional)"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-slate-900 font-mono"
-            />
-            <div className="flex justify-end">
-              <button onClick={() => { setShowApiKeyModal(false); showToast("Engine preference saved!"); }} className="px-4 py-2 bg-slate-900 text-white font-semibold rounded-xl">
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 3: STANDALONE LEARNING */}
+      {/* Standalone Learning Modal */}
       {showStandaloneLearning && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-5 shadow-xl space-y-4 text-xs">
-            <h3 className="font-bold text-sm text-slate-900">Log Deliberate Upskilling</h3>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`border rounded-2xl max-w-md w-full p-5 shadow-xl space-y-4 text-xs ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
+            <h3 className="font-bold text-sm">Log Deliberate Upskilling</h3>
             <form onSubmit={handleSaveStandaloneLearning} className="space-y-3">
-              <select value={standaloneModule} onChange={e => setStandaloneModule(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-slate-800">
+              <select value={standaloneModule} onChange={e => setStandaloneModule(e.target.value)} className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"}`}>
                 {learningModules.map(m => <option key={m.Module_Code} value={m.Module_Code}>[{m.Module_Code}] {m.Topic_Title}</option>)}
               </select>
-              <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <div className={`grid grid-cols-2 gap-3 p-3 rounded-xl border ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200"}`}>
                 <div>
-                  <span className="text-slate-500 block mb-1">Hours: {standaloneHours}h</span>
+                  <span className="text-slate-400 block mb-1">Hours: {standaloneHours}h</span>
                   <input type="range" min="0" max="4" step="1" value={standaloneHours} onChange={e => setStandaloneHours(Number(e.target.value))} className="w-full accent-purple-600" />
                 </div>
                 <div>
-                  <span className="text-slate-500 block mb-1">Minutes: {standaloneMins}m</span>
+                  <span className="text-slate-400 block mb-1">Minutes: {standaloneMins}m</span>
                   <input type="range" min="0" max="45" step="15" value={standaloneMins} onChange={e => setStandaloneMins(Number(e.target.value))} className="w-full accent-purple-600" />
                 </div>
               </div>
-              <input type="text" required value={standaloneNotes} onChange={e => setStandaloneNotes(e.target.value)} placeholder="What did you practice or build?" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5" />
+              <input type="text" required value={standaloneNotes} onChange={e => setStandaloneNotes(e.target.value)} placeholder="What did you practice or build?" className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-900"}`} />
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setShowStandaloneLearning(false)} className="px-3 py-2 text-slate-500">Cancel</button>
+                <button type="button" onClick={() => setShowStandaloneLearning(false)} className="px-3 py-2 text-slate-400">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-purple-600 text-white font-semibold rounded-xl">Save Learning</button>
               </div>
             </form>
@@ -2173,11 +1581,11 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL 4: ONBOARD MEMBER */}
+      {/* Onboard Member Modal */}
       {showEmpModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-5 shadow-xl space-y-3 text-xs">
-            <h3 className="text-sm font-bold text-slate-900">Onboard Team Member</h3>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`border rounded-2xl max-w-md w-full p-5 shadow-xl space-y-3 text-xs ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
+            <h3 className="text-sm font-bold">Onboard Team Member</h3>
             <form onSubmit={(e) => {
               e.preventDefault();
               const entry = { Emp_ID: "IE-" + ("00" + (employees.length + 1)).slice(-3), Name: newEmp.name, Email: newEmp.email.toLowerCase().trim(), Role_Title: newEmp.roleTitle, Department: newEmp.department, Level: newEmp.level, "R&R_Summary": newEmp.rnrSummary, Status: "Active" };
@@ -2185,14 +1593,13 @@ export default function App() {
               if (!activeEmployeeEmail) setActiveEmployeeEmail(entry.Email);
               setShowEmpModal(false);
               showToast(`Onboarded ${entry.Name}!`);
-              try { fetch(APPS_SCRIPT_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: "addEmployee", ...newEmp }) }); } catch (err) {}
             }} className="space-y-3">
-              <input required type="text" value={newEmp.name} onChange={e => setNewEmp({...newEmp, name: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5" placeholder="Full Name" />
-              <input required type="email" value={newEmp.email} onChange={e => setNewEmp({...newEmp, email: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5" placeholder="Email Address" />
-              <input required type="text" value={newEmp.roleTitle} onChange={e => setNewEmp({...newEmp, roleTitle: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5" placeholder="Role Title" />
-              <textarea rows="3" required value={newEmp.rnrSummary} onChange={e => setNewEmp({...newEmp, rnrSummary: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5" placeholder="Baseline KRAs..." />
+              <input required type="text" value={newEmp.name} onChange={e => setNewEmp({...newEmp, name: e.target.value})} className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} placeholder="Full Name" />
+              <input required type="email" value={newEmp.email} onChange={e => setNewEmp({...newEmp, email: e.target.value})} className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} placeholder="Email Address" />
+              <input required type="text" value={newEmp.roleTitle} onChange={e => setNewEmp({...newEmp, roleTitle: e.target.value})} className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} placeholder="Role Title" />
+              <textarea rows="3" required value={newEmp.rnrSummary} onChange={e => setNewEmp({...newEmp, rnrSummary: e.target.value})} className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} placeholder="Baseline KRAs..." />
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setShowEmpModal(false)} className="px-3 py-2 text-slate-500">Cancel</button>
+                <button type="button" onClick={() => setShowEmpModal(false)} className="px-3 py-2 text-slate-400">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl">Onboard</button>
               </div>
             </form>
@@ -2200,22 +1607,22 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL 5: ADD PROJECT */}
+      {/* Add Project Modal */}
       {showPrjModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-5 shadow-xl space-y-3 text-xs">
-            <h3 className="text-sm font-bold text-slate-900">Add Project Pillar</h3>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`border rounded-2xl max-w-md w-full p-5 shadow-xl space-y-3 text-xs ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
+            <h3 className="text-sm font-bold">Add Project Pillar</h3>
             <form onSubmit={(e) => {
               e.preventDefault();
               const entry = { Project_ID: newPrj.projectId.toUpperCase().trim(), Project_Name: newPrj.projectName, Priority_Level: newPrj.priority, Status: "Active" };
               setProjects(prev => [...prev, entry]);
               setShowPrjModal(false);
-              try { fetch(APPS_SCRIPT_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: "createProject", ...newPrj }) }); } catch (err) {}
+              showToast(`Project ${entry.Project_ID} added!`);
             }} className="space-y-3">
-              <input required type="text" value={newPrj.projectId} onChange={e => setNewPrj({...newPrj, projectId: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 uppercase" placeholder="Code (e.g. PRJ-ROBO)" />
-              <input required type="text" value={newPrj.projectName} onChange={e => setNewPrj({...newPrj, projectName: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5" placeholder="Project Name" />
+              <input required type="text" value={newPrj.projectId} onChange={e => setNewPrj({...newPrj, projectId: e.target.value})} className={`w-full rounded-xl p-2.5 uppercase border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} placeholder="Code (e.g. PRJ-ROBO)" />
+              <input required type="text" value={newPrj.projectName} onChange={e => setNewPrj({...newPrj, projectName: e.target.value})} className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} placeholder="Project Name" />
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setShowPrjModal(false)} className="px-3 py-2 text-slate-500">Cancel</button>
+                <button type="button" onClick={() => setShowPrjModal(false)} className="px-3 py-2 text-slate-400">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl">Save Project</button>
               </div>
             </form>
@@ -2223,30 +1630,30 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL 6: ADD TASK CODE */}
+      {/* Add Task Code Modal */}
       {showTskModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-5 shadow-xl space-y-3 text-xs">
-            <h3 className="text-sm font-bold text-slate-900">Add Task Code</h3>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`border rounded-2xl max-w-md w-full p-5 shadow-xl space-y-3 text-xs ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
+            <h3 className="text-sm font-bold">Add Task Code</h3>
             <form onSubmit={(e) => {
               e.preventDefault();
               const finalCat = newTsk.category === "NEW" ? (newTsk.customCategory || "General") : newTsk.category;
               const entry = { Task_Code: newTsk.taskCode.toUpperCase().trim(), Task_Title: newTsk.taskTitle, Category: finalCat };
               setTasks(prev => [...prev, entry]);
               setShowTskModal(false);
-              try { fetch(APPS_SCRIPT_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: "createTask", taskCode: entry.Task_Code, taskTitle: entry.Task_Title, category: finalCat }) }); } catch (err) {}
+              showToast(`Added task ${entry.Task_Code}`);
             }} className="space-y-3">
-              <input required type="text" value={newTsk.taskCode} onChange={e => setNewTsk({...newTsk, taskCode: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 uppercase" placeholder="Code (e.g. TSK-CAD)" />
-              <input required type="text" value={newTsk.taskTitle} onChange={e => setNewTsk({...newTsk, taskTitle: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5" placeholder="Task Title" />
-              <select value={newTsk.category} onChange={e => setNewTsk({...newTsk, category: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5">
+              <input required type="text" value={newTsk.taskCode} onChange={e => setNewTsk({...newTsk, taskCode: e.target.value})} className={`w-full rounded-xl p-2.5 uppercase border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} placeholder="Code (e.g. TSK-CAD)" />
+              <input required type="text" value={newTsk.taskTitle} onChange={e => setNewTsk({...newTsk, taskTitle: e.target.value})} className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} placeholder="Task Title" />
+              <select value={newTsk.category} onChange={e => setNewTsk({...newTsk, category: e.target.value})} className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`}>
                 {taskCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 <option value="NEW">+ New Category Bucket...</option>
               </select>
               {newTsk.category === "NEW" && (
-                <input required type="text" value={newTsk.customCategory} onChange={e => setNewTsk({...newTsk, customCategory: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5" placeholder="New Category Name" />
+                <input required type="text" value={newTsk.customCategory} onChange={e => setNewTsk({...newTsk, customCategory: e.target.value})} className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} placeholder="New Category Name" />
               )}
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setShowTskModal(false)} className="px-3 py-2 text-slate-500">Cancel</button>
+                <button type="button" onClick={() => setShowTskModal(false)} className="px-3 py-2 text-slate-400">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl">Add Task</button>
               </div>
             </form>
