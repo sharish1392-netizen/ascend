@@ -308,7 +308,7 @@ Rules for each split object:
   };
 
   // Try gemini-2.5-flash first, automatically fall back to gemini-2.0-flash if needed
-  const modelsToTry = ["gemini-2.5-flash", "gemini-2.0-flash"];
+  const modelsToTry = ["gemini-3.8-flash", "gemini-3.0-flash", "gemini-2.5-flash"];
   let lastError = null;
 
   for (const modelName of modelsToTry) {
