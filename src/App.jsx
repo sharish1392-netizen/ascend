@@ -8,7 +8,7 @@ import {
   Mic, MicOff, Wand2, Smartphone, Monitor, Key, X, ArrowRight
 } from 'lucide-react';
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzMjWhJeFcAfKqdTT4aDENa2Pfp7gnIhVQ_rGQPPMh6UYuXle50niV3Tym-vgC_37RnTg/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz4v1XX9-m0Zu_xEgEzyeCI361wydctuHupDCxgPEhfDWuqgD-AtVrESJ-s6cE4kA2xtA/exec";
 
 const DEFAULT_PROJECTS = [
   { Project_ID: "PRJ-DEXTER", Project_Name: "Dexter Box Science Kits", Priority_Level: "P1 Critical", Status: "Active" },
@@ -20,24 +20,24 @@ const DEFAULT_PROJECTS = [
 ];
 
 const DEFAULT_TASKS = [
-  { Task_Code: "TSK-PROP", Task_Title: "Concept Notes, Proposals & Estimates", Category: "BD & Client Proposals" },
-  { Task_Code: "TSK-DECK", Task_Title: "Client Pitch Decks & Presentations", Category: "BD & Client Proposals" },
-  { Task_Code: "TSK-FOLLOW", Task_Title: "Client Mailing, Follow-ups & Coordination", Category: "BD & Client Proposals" },
-  { Task_Code: "TSK-MEET", Task_Title: "Client Meetings, School Visits & Demos", Category: "BD & Client Proposals" },
-  { Task_Code: "TSK-RND", Task_Title: "Product R&D, Prototyping & Experiments", Category: "R&D & Product Engineering" },
-  { Task_Code: "TSK-BOM", Task_Title: "Bill of Materials (BOM), Sourcing & Costing", Category: "R&D & Product Engineering" },
-  { Task_Code: "TSK-CURR", Task_Title: "Curriculum Mapping, Manuals & Lesson Plans", Category: "R&D & Product Engineering" },
-  { Task_Code: "TSK-DES-PROD", Task_Title: "Product & Packaging Design (Boxes/Manuals)", Category: "Design & Digital Media" },
-  { Task_Code: "TSK-DES-MKT", Task_Title: "Marketing Collaterals & Social Media Posters", Category: "Design & Digital Media" },
-  { Task_Code: "TSK-DES-EVT", Task_Title: "Event, Expo & Workshop Signage/Backdrops", Category: "Design & Digital Media" },
-  { Task_Code: "TSK-VIDEO", Task_Title: "Video Scripting, Shooting & Editing", Category: "Design & Digital Media" },
-  { Task_Code: "TSK-TRN-STU", Task_Title: "Student Classroom Facilitation & Sessions", Category: "Training & Field Execution" },
-  { Task_Code: "TSK-TRN-TCH", Task_Title: "Teacher Training Workshops & Mentorship", Category: "Training & Field Execution" },
-  { Task_Code: "TSK-EXPO", Task_Title: "School Expo, Science Mela & Event Support", Category: "Training & Field Execution" },
-  { Task_Code: "TSK-KIT-OPS", Task_Title: "Kit Assembly, QC, Packing & Dispatch", Category: "Operations & Supply Chain" },
-  { Task_Code: "TSK-LAB-AUD", Task_Title: "School Lab Setup, Audit & Maintenance", Category: "Operations & Supply Chain" },
-  { Task_Code: "TSK-FIN", Task_Title: "Salary Processing, Invoicing & Accounts", Category: "HR, Finance & Office Admin" },
-  { Task_Code: "TSK-HR-ADM", Task_Title: "HR, Scheduling & General Office Admin", Category: "HR, Finance & Office Admin" }
+  { Task_Code: "TSK-PROP", Task_Title: "Concept Notes, Proposals & Estimates", Category: "BD & Client Proposals", Aliases: "proposal, estimate, concept note, quote, costing sheet, tender, rfp,mou" },
+  { Task_Code: "TSK-DECK", Task_Title: "Client Pitch Decks & Presentations", Category: "BD & Client Proposals", Aliases: "deck, ppt, presentation, slides, pitch deck" },
+  { Task_Code: "TSK-FOLLOW", Task_Title: "Client Mailing, Follow-ups & Coordination", Category: "BD & Client Proposals", Aliases: "follow up, followup, mail, email, calling, client call, lead coordination" },
+  { Task_Code: "TSK-MEET", Task_Title: "Client Meetings, School Visits & Demos", Category: "BD & Client Proposals", Aliases: "meeting, school visit, principal meet, demo, pitch meeting, client visit" },
+  { Task_Code: "TSK-RND", Task_Title: "Product R&D, Prototyping & Experiments", Category: "R&D & Product Engineering", Aliases: "rnd, r&d, prototype, prototyping, experiment, testing, 3d print, laser cut, mdf, circuit, breadboard, cad" },
+  { Task_Code: "TSK-BOM", Task_Title: "Bill of Materials (BOM), Sourcing & Costing", Category: "R&D & Product Engineering", Aliases: "bom, bill of materials, sourcing, vendor, supplier, procurement, component buying, price negotiation" },
+  { Task_Code: "TSK-CURR", Task_Title: "Curriculum Mapping, Manuals & Lesson Plans", Category: "R&D & Product Engineering", Aliases: "curriculum, manual, workbook, lesson plan, activity guide, worksheet, syllabus, textbook" },
+  { Task_Code: "TSK-DES-PROD", Task_Title: "Product & Packaging Design (Boxes/Manuals)", Category: "Design & Digital Media", Aliases: "packaging, box design, sticker, label, manual layout, kit box" },
+  { Task_Code: "TSK-DES-MKT", Task_Title: "Marketing Collaterals & Social Media Posters", Category: "Design & Digital Media", Aliases: "poster, social media, instagram, linkedin, brochure, flyer, pamphlet, marketing design, creative" },
+  { Task_Code: "TSK-DES-EVT", Task_Title: "Event, Expo & Workshop Signage/Backdrops", Category: "Design & Digital Media", Aliases: "backdrop, banner, standee, signage, certificate design, badge, event poster" },
+  { Task_Code: "TSK-VIDEO", Task_Title: "Video Scripting, Shooting & Editing", Category: "Design & Digital Media", Aliases: "video, shooting, editing, script, scripting, montage, reel, voiceover, camera, studio shoot" },
+  { Task_Code: "TSK-TRN-STU", Task_Title: "Student Classroom Facilitation & Sessions", Category: "Training & Field Execution", Aliases: "student training, classroom session, facilitation, maker session, school class, teaching, workshop" },
+  { Task_Code: "TSK-TRN-TCH", Task_Title: "Teacher Training Workshops & Mentorship", Category: "Training & Field Execution", Aliases: "teacher training, educator workshop, step program, faculty training, mentorship" },
+  { Task_Code: "TSK-EXPO", Task_Title: "School Expo, Science Mela & Event Support", Category: "Training & Field Execution", Aliases: "expo, science mela, exhibition, competition, booth setup, amt, teacon, showcase" },
+  { Task_Code: "TSK-KIT-OPS", Task_Title: "Kit Assembly, QC, Packing & Dispatch", Category: "Operations & Supply Chain", Aliases: "packing, kit assembly, dispatch, courier, quality check, qc, kitting, carton, delivery" },
+  { Task_Code: "TSK-LAB-AUD", Task_Title: "School Lab Setup, Audit & Maintenance", Category: "Operations & Supply Chain", Aliases: "lab setup, inventory audit, stock check, calibration, tool maintenance, stocktaking" },
+  { Task_Code: "TSK-FIN", Task_Title: "Salary Processing, Invoicing & Accounts", Category: "HR, Finance & Office Admin", Aliases: "salary, payroll, invoice, billing, gst, accounts, reimbursement, payment, bank, tally" },
+  { Task_Code: "TSK-HR-ADM", Task_Title: "HR, Scheduling & General Office Admin", Category: "HR, Finance & Office Admin", Aliases: "hr, recruitment, interview, onboarding, office admin, housekeeping, schedule, leave" }
 ];
 
 const DEFAULT_LEARNING = [
@@ -126,80 +126,155 @@ function calculateUniqueDayStreak(userLogs) {
   return streak;
 }
 
-// ================= HYBRID SMART PARSER (LOCAL KEYWORD + GEMINI AI) =================
-function localSmartParse(inputText, employees, currentWorkboard, activeEmail) {
+// ================= MULTI-CLAUSE VOICE SPLITTER (100% LOCAL, NO API KEY NEEDED) =================
+function splitSpokenMultiTasks(rawInput) {
+  if (!rawInput) return [];
+  let text = rawInput
+    .replace(/\bone and a half hours?\b/gi, "1.5 hours")
+    .replace(/\ba couple of hours\b/gi, "2 hours")
+    .replace(/\ban hour\b/gi, "1 hour")
+    .replace(/\bone hour\b/gi, "1 hour")
+    .replace(/\btwo hours\b/gi, "2 hours")
+    .replace(/\bthree hours\b/gi, "3 hours")
+    .replace(/\bfour hours\b/gi, "4 hours")
+    .replace(/\bhalf an hour\b/gi, "30 mins")
+    .replace(/\bhalf hour\b/gi, "30 mins");
+
+  const primaryDelimiters = /\s*(?:;|\band then\b|\balso\b|\bplus\b|\bafter that\b|\bnext\b|\bsecondly\b|\bthirdly\b|\bapart from that\b|\bas well as\b)\s*|\s+\band\b\s+(?=(?:spent|worked|did|completed|finished|logged|add|create|plan|need to|studied|learned|\d+\s*(?:hours?|hrs?|h|minutes?|mins?|m)\b))/i;
+
+  let chunks = text.split(primaryDelimiters).map(s => s.trim()).filter(Boolean);
+
+  const finalSegments = [];
+  chunks.forEach(chunk => {
+    const subParts = chunk.split(/,\s*(?=(?:spent|worked|did|add|plan|\d+(?:\.\d+)?\s*(?:hours?|hrs?|h|minutes?|mins?|m)\b))/i);
+    subParts.forEach(sp => {
+      if (sp.trim()) finalSegments.push(sp.trim());
+    });
+  });
+
+  return finalSegments.length > 0 ? finalSegments : [rawInput.trim()];
+}
+
+function matchOrMintTaskCode(segmentText, tasksCatalog, learnedAliasesMap) {
+  const lower = segmentText.toLowerCase();
+  const stopWords = new Set(["spent", "worked", "hours", "hour", "mins", "minutes", "with", "for", "the", "and", "task", "add", "done", "completed", "finished", "today", "school", "project", "team", "from", "into", "that", "this"]);
+  const tokens = lower.replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
+
+  let bestTask = null;
+  let highestScore = 0;
+
+  tasksCatalog.forEach(t => {
+    let score = 0;
+    const codeKey = t.Task_Code;
+    const combinedText = `${t.Task_Title} ${t.Category} ${t.Aliases || ""} ${(learnedAliasesMap[codeKey] || []).join(" ")}`.toLowerCase();
+
+    const aliasList = `${t.Aliases || ""}, ${(learnedAliasesMap[codeKey] || []).join(", ")}`
+      .split(",")
+      .map(a => a.trim().toLowerCase())
+      .filter(Boolean);
+
+    aliasList.forEach(alias => {
+      if (alias.length > 2 && lower.includes(alias)) {
+        score += 4;
+      }
+    });
+
+    tokens.forEach(tok => {
+      const stem = tok.replace(/(?:ing|ed|s|es)$/, "");
+      if (stem.length >= 3 && combinedText.includes(stem)) {
+        score += 2;
+      }
+    });
+
+    if (score > highestScore) {
+      highestScore = score;
+      bestTask = t;
+    }
+  });
+
+  if (bestTask && highestScore >= 2) {
+    return {
+      taskCode: bestTask.Task_Code,
+      taskTitle: bestTask.Task_Title,
+      category: bestTask.Category || "General",
+      isNewTask: false,
+      triggerToken: tokens[0] || ""
+    };
+  }
+
+  const meaningfulWords = tokens.filter(w => !/^(dexter|maker|atl|atal|csr|ngo|step|amt|maharishi|velammal)$/.test(w));
+  const rootWord = (meaningfulWords[0] || tokens[0] || "WORK").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
+  const candidateCode = `TSK-${rootWord.length >= 3 ? rootWord : "GEN"}`;
+
+  const existingCodeMatch = tasksCatalog.find(t => t.Task_Code === candidateCode);
+  if (existingCodeMatch) {
+    return {
+      taskCode: existingCodeMatch.Task_Code,
+      taskTitle: existingCodeMatch.Task_Title,
+      category: existingCodeMatch.Category || "General",
+      isNewTask: false,
+      triggerToken: tokens[0] || ""
+    };
+  }
+
+  let inferredCategory = "Operations & Supply Chain";
+  if (/legal|patent|ip|trademark|compliance|safety|policy/.test(lower)) inferredCategory = "HR, Finance & Office Admin";
+  else if (/web|app|code|software|bug|server|portal|sheet/.test(lower)) inferredCategory = "R&D & Product Engineering";
+  else if (/pr|press|media|podcast|youtube|blog/.test(lower)) inferredCategory = "Design & Digital Media";
+  else if (/partner|mou|tieup|franchise|dealer/.test(lower)) inferredCategory = "BD & Client Proposals";
+
+  const cleanNewTitle = meaningfulWords.slice(0, 3).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") || "Specialized Activity";
+
+  return {
+    taskCode: candidateCode,
+    taskTitle: `${cleanNewTitle} & Execution`,
+    category: inferredCategory,
+    isNewTask: true,
+    triggerToken: meaningfulWords.join(", ")
+  };
+}
+
+function localSmartParse(inputText, employees, tasksCatalog, learnedAliasesMap, currentWorkboard, activeEmail) {
   const today = getTodayStr();
-  // Split multiple tasks if user says "and also", "plus", or uses semicolons
-  const segments = inputText
-    .split(/\s+(?:and also|plus|then)\s+|;/i)
-    .map(s => s.trim())
-    .filter(Boolean);
+  const segments = splitSpokenMultiTasks(inputText);
 
   return segments.map((seg, idx) => {
     const lower = seg.toLowerCase();
 
-    // 1. Detect Duration (Hours & Minutes)
     let minutes = 0;
     const hrMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h\b)/);
     const minMatch = lower.match(/(\d+)\s*(?:minutes?|mins?|m\b)/);
     if (hrMatch) minutes += Math.round(parseFloat(hrMatch[1]) * 60);
     if (minMatch) minutes += parseInt(minMatch[1], 10);
-    if (lower.includes("half an hour") || lower.includes("half hour")) minutes += 30;
-    if (lower.includes("one hour") || lower.includes("an hour")) minutes = Math.max(minutes, 60);
-    if (lower.includes("two hours")) minutes = Math.max(minutes, 120);
-    if (lower.includes("three hours")) minutes = Math.max(minutes, 180);
 
-    // 2. Detect Progress %
     let progress = minutes > 0 ? 100 : 0;
     const progMatch = lower.match(/(\d+)\s*%/);
     if (progMatch) {
       progress = Math.min(100, Math.max(0, parseInt(progMatch[1], 10)));
-    } else if (lower.includes("half done") || lower.includes("in progress")) {
+    } else if (lower.includes("half done") || lower.includes("in progress") || lower.includes("partially")) {
       progress = 50;
     } else if (lower.includes("completed") || lower.includes("finished") || lower.includes("done")) {
       progress = 100;
     }
 
-    // 3. Detect Intent: LOG_TIME vs ADD_TASK vs LEARNING
     let intent = minutes > 0 ? "LOG_TIME" : "ADD_TASK";
-    if (lower.startsWith("add task") || lower.startsWith("plan ") || lower.startsWith("todo") || lower.includes("need to")) {
+    if (lower.startsWith("add ") || lower.startsWith("plan ") || lower.startsWith("todo") || lower.includes("need to") || lower.includes("have to")) {
       intent = "ADD_TASK";
     }
     if (lower.includes("upskill") || lower.includes("studied") || lower.includes("learned") || lower.includes("practiced")) {
       if (minutes > 0) intent = "LOG_LEARNING";
     }
 
-    // 4. Detect Project Pillar
     let projectId = "PRJ-MAKER";
     if (/dexter|kit|box|grade/.test(lower)) projectId = "PRJ-DEXTER";
     else if (/atl|atal|tinkering|niti/.test(lower)) projectId = "PRJ-ATL";
     else if (/csr|ngo|sponsor|foundation/.test(lower)) projectId = "PRJ-CSR";
     else if (/step|teacher|faculty|educator|pedagogy/.test(lower)) projectId = "PRJ-STEP";
-    else if (/admin|salary|payroll|hr|invoice|account|office/.test(lower)) projectId = "PRJ-ADMIN";
+    else if (/admin|salary|payroll|hr|invoice|account|office|safety|legal/.test(lower)) projectId = "PRJ-ADMIN";
     else if (/maker|studio|lab|amt|expo|school/.test(lower)) projectId = "PRJ-MAKER";
 
-    // 5. Detect Specific Task Code
-    let taskCode = "TSK-EXPO";
-    if (/proposal|estimate|concept note|quote|rfp/.test(lower)) taskCode = "TSK-PROP";
-    else if (/deck|ppt|presentation|slide/.test(lower)) taskCode = "TSK-DECK";
-    else if (/follow|mail|email|call/.test(lower)) taskCode = "TSK-FOLLOW";
-    else if (/meet|visit|demo|pitch/.test(lower)) taskCode = "TSK-MEET";
-    else if (/bom|bill of material|sourcing|vendor|costing/.test(lower)) taskCode = "TSK-BOM";
-    else if (/rnd|r&d|prototype|experiment|3d|cad|circuit/.test(lower)) taskCode = "TSK-RND";
-    else if (/curriculum|manual|lesson|workbook/.test(lower)) taskCode = "TSK-CURR";
-    else if (/packaging|box art|sticker|label/.test(lower)) taskCode = "TSK-DES-PROD";
-    else if (/poster|social|insta|reel| flyer|marketing|brochure/.test(lower)) taskCode = "TSK-DES-MKT";
-    else if (/backdrop|banner|signage|standee/.test(lower)) taskCode = "TSK-DES-EVT";
-    else if (/video|shoot|edit|script|montage|audio/.test(lower)) taskCode = "TSK-VIDEO";
-    else if (/teacher|educator|step/.test(lower)) taskCode = "TSK-TRN-TCH";
-    else if (/student|class|session|workshop/.test(lower)) taskCode = "TSK-TRN-STU";
-    else if (/expo|mela|competition|event|amt/.test(lower)) taskCode = "TSK-EXPO";
-    else if (/pack|dispatch|qc|assembly|inventory/.test(lower)) taskCode = "TSK-KIT-OPS";
-    else if (/audit|maintenance|setup/.test(lower)) taskCode = "TSK-LAB-AUD";
-    else if (/salary|invoice|bill|finance|tax|gst/.test(lower)) taskCode = "TSK-FIN";
-    else if (/hr|leave|schedule|admin/.test(lower)) taskCode = "TSK-HR-ADM";
+    const taskMatch = matchOrMintTaskCode(seg, tasksCatalog, learnedAliasesMap);
 
-    // 6. Detect Collaborators by Name
     const collaborators = [activeEmail].filter(Boolean);
     (employees || []).forEach(emp => {
       const firstName = (emp.Name || "").split(" ")[0].toLowerCase();
@@ -208,32 +283,35 @@ function localSmartParse(inputText, employees, currentWorkboard, activeEmail) {
       }
     });
 
-    // 7. Match Existing Card in Workboard if Logging Time
     let matchedPulseId = null;
     if (intent === "LOG_TIME" && currentWorkboard?.length > 0) {
       const match = currentWorkboard.find(p => 
-        p.Project_ID === projectId && p.Task_Code === taskCode && Number(p.Auto_Task_Hours || 0) < 100
+        p.Project_ID === projectId && p.Task_Code === taskMatch.taskCode && Number(p.Auto_Task_Hours || 0) < 100
       ) || currentWorkboard.find(p => 
         p.Project_ID === projectId && Number(p.Auto_Task_Hours || 0) < 100
       );
       if (match) matchedPulseId = match.Pulse_ID;
     }
 
-    // 8. Clean Title
     let cleanTitle = seg
-      .replace(/^(add task|log|spent|worked|did|completed|finished)\s*:?\s*/i, "")
-      .replace(/\b\d+\s*(?:hours?|hrs?|h|minutes?|mins?|m)\b/gi, "")
+      .replace(/^(add task|add|log|spent|worked|did|completed|finished|need to|have to)\s*:?\s*/i, "")
+      .replace(/\b\d+(?:\.\d+)?\s*(?:hours?|hrs?|h|minutes?|mins?|m)\b/gi, "")
+      .replace(/\b(?:on|for|in)\b\s+/i, "")
       .replace(/\b\d+\s*%/g, "")
       .replace(/\s+/g, " ")
       .trim();
-    if (cleanTitle.length < 3) cleanTitle = seg;
+    if (cleanTitle.length < 3) cleanTitle = seg.trim();
     cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
 
     return {
-      id: Date.now() + idx,
+      id: Date.now() + idx + Math.random(),
       intent,
       projectId,
-      taskCode,
+      taskCode: taskMatch.taskCode,
+      newTaskTitle: taskMatch.taskTitle,
+      newTaskCategory: taskMatch.category,
+      isNewTask: taskMatch.isNewTask,
+      triggerToken: taskMatch.triggerToken,
       title: cleanTitle,
       minutes: minutes || (intent === "LOG_TIME" ? 60 : 0),
       progress: intent === "ADD_TASK" ? 0 : progress,
@@ -241,7 +319,7 @@ function localSmartParse(inputText, employees, currentWorkboard, activeEmail) {
       collaborators,
       matchedPulseId,
       learningModuleCode: "LRN-HARD-01",
-      engine: "Smart Local Rules"
+      engine: "Smart Multi-Task Local Engine"
     };
   });
 }
@@ -251,23 +329,28 @@ async function geminiSmartParse(inputText, apiKey, projects, tasks, employees, a
   const prompt = `You are an operational task & time parser for Infinite Engineers (IE Skool).
 Today's date is ${today}. Active user email: ${activeEmail}.
 Available Projects: ${JSON.stringify(projects.map(p => ({ id: p.Project_ID, name: p.Project_Name })))}
-Available Tasks: ${JSON.stringify(tasks.map(t => ({ code: t.Task_Code, title: t.Task_Title, category: t.Category })))}
+Available Tasks: ${JSON.stringify(tasks.map(t => ({ code: t.Task_Code, title: t.Task_Title, category: t.Category, aliases: t.Aliases || "" })))}
 Available Team Members: ${JSON.stringify(employees.map(e => ({ name: e.Name, email: e.Email })))}
 
-Parse the following user voice/text input into a JSON array of objects.
+Split and parse the following user voice/text input into a JSON array of distinct task objects (if the user mentions 2 or 3 tasks, output 2 or 3 objects).
 Input: "${inputText}"
 
-Rules:
+Anti-Duplicate Rules:
+- Always map to the closest existing Task_Code in Available Tasks if there is even 60% conceptual similarity.
+- ONLY set "isNewTask": true and invent a new "taskCode" (format "TSK-XXXX"), "newTaskTitle", and "newTaskCategory" if the activity is genuinely unrepresented in Available Tasks.
 - Each object must have:
-  - "intent": "ADD_TASK" (if planning/creating a task with no time spent yet) or "LOG_TIME" (if logging time spent/worked/completed) or "LOG_LEARNING" (if upskilling/studying).
-  - "projectId": best matching Project_ID from Available Projects.
-  - "taskCode": best matching Task_Code from Available Tasks.
-  - "title": concise, clean deliverable description (include school/client names like AMT School if mentioned).
-  - "minutes": integer minutes spent (e.g., 1.5 hours = 90; 0 if intent is ADD_TASK).
-  - "progress": integer 0 to 100 (default 100 if LOG_TIME unless user specifies partial %; 0 if ADD_TASK).
-  - "deadline": YYYY-MM-DD (default "${today}").
-  - "collaborators": array of emails (always include "${activeEmail}", plus any mentioned teammate emails).
-Return ONLY valid JSON array.`;
+  - "intent": "ADD_TASK" or "LOG_TIME" or "LOG_LEARNING"
+  - "projectId": best matching Project_ID
+  - "taskCode": existing Task_Code (or new TSK-XXXX if isNewTask is true)
+  - "isNewTask": boolean
+  - "newTaskTitle": string (title for the task code)
+  - "newTaskCategory": string (category bucket)
+  - "title": concise deliverable statement
+  - "minutes": integer minutes (0 if ADD_TASK)
+  - "progress": integer 0-100
+  - "deadline": YYYY-MM-DD
+  - "collaborators": array of emails
+Return ONLY a valid JSON array.`;
 
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
     method: "POST",
@@ -283,16 +366,21 @@ Return ONLY valid JSON array.`;
   const parsed = JSON.parse(rawText);
 
   return (Array.isArray(parsed) ? parsed : [parsed]).map((item, idx) => {
+    const existsInCatalog = tasks.some(t => t.Task_Code === item.taskCode);
     let matchedPulseId = null;
     if (item.intent === "LOG_TIME" && currentWorkboard?.length > 0) {
       const match = currentWorkboard.find(p => p.Project_ID === item.projectId && p.Task_Code === item.taskCode && Number(p.Auto_Task_Hours || 0) < 100);
       if (match) matchedPulseId = match.Pulse_ID;
     }
     return {
-      id: Date.now() + idx,
+      id: Date.now() + idx + Math.random(),
       intent: item.intent || "ADD_TASK",
       projectId: item.projectId || "PRJ-MAKER",
       taskCode: item.taskCode || "TSK-EXPO",
+      newTaskTitle: item.newTaskTitle || "Specialized Execution",
+      newTaskCategory: item.newTaskCategory || "Operations & Supply Chain",
+      isNewTask: Boolean(item.isNewTask && !existsInCatalog),
+      triggerToken: "",
       title: item.title || inputText,
       minutes: Number(item.minutes || 0),
       progress: Number(item.progress ?? (item.intent === "LOG_TIME" ? 100 : 0)),
@@ -306,12 +394,11 @@ Return ONLY valid JSON array.`;
 }
 
 export default function App() {
-  const [viewRole, setViewRole] = useState("employee"); // 'employee' | 'company'
+  const [viewRole, setViewRole] = useState("employee");
   const [activeEmployeeEmail, setActiveEmployeeEmail] = useState(() => localStorage.getItem("ie_v3_active_emp") || "");
   const [companyTab, setCompanyTab] = useState("workload");
   const [employeeTab, setEmployeeTab] = useState("workboard");
 
-  // Responsive Mobile Detection + Manual Preview Toggle
   const [isMobileScreen, setIsMobileScreen] = useState(() => window.innerWidth < 768);
   const [forceMobilePreview, setForceMobilePreview] = useState(false);
   const isCompactMobile = isMobileScreen || forceMobilePreview;
@@ -322,7 +409,6 @@ export default function App() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Persistent Data States
   const [employees, setEmployees] = useState(() => {
     const saved = localStorage.getItem("ie_v3_employees");
     return saved ? JSON.parse(saved) : [];
@@ -334,6 +420,10 @@ export default function App() {
   const [tasks, setTasks] = useState(() => {
     const saved = localStorage.getItem("ie_v3_tasks");
     return saved ? mergeById(JSON.parse(saved), DEFAULT_TASKS, "Task_Code") : DEFAULT_TASKS;
+  });
+  const [learnedAliases, setLearnedAliases] = useState(() => {
+    const saved = localStorage.getItem("ie_v4_learned_aliases");
+    return saved ? JSON.parse(saved) : {};
   });
   const [learningModules, setLearningModules] = useState(() => {
     const saved = localStorage.getItem("ie_v3_learning");
@@ -348,7 +438,6 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Smart Voice / AI Command Bar States
   const [smartInput, setSmartInput] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isParsingAI, setIsParsingAI] = useState(false);
@@ -361,23 +450,16 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
-  // Filters
   const [selectedCompanyEmp, setSelectedCompanyEmp] = useState("ALL");
   const [analyticsTimeframe, setAnalyticsTimeframe] = useState("WEEK");
   const [personalFocusTimeframe, setPersonalFocusTimeframe] = useState("WEEK");
   const [workboardSearch, setWorkboardSearch] = useState("");
 
-  // Modals
   const [showEmpModal, setShowEmpModal] = useState(false);
   const [showPrjModal, setShowPrjModal] = useState(false);
   const [showTskModal, setShowTskModal] = useState(false);
-  const [showLrnModal, setShowLrnModal] = useState(false);
   const [showStandaloneLearning, setShowStandaloneLearning] = useState(false);
 
-  const [editingProject, setEditingProject] = useState(null);
-  const [editingTask, setEditingTask] = useState(null);
-
-  // In-Card Logging Modal
   const [activeLoggingItem, setActiveLoggingItem] = useState(null);
   const [sessionSliderHours, setSessionSliderHours] = useState(1);
   const [sessionSliderMins, setSessionSliderMins] = useState(30);
@@ -387,7 +469,6 @@ export default function App() {
   const [sessionNotes, setSessionNotes] = useState("");
   const [isSubmittingSession, setIsSubmittingSession] = useState(false);
 
-  // Standalone Learning Modal
   const [standaloneModule, setStandaloneModule] = useState("LRN-HARD-01");
   const [standaloneHours, setStandaloneHours] = useState(0);
   const [standaloneMins, setStandaloneMins] = useState(45);
@@ -409,7 +490,6 @@ export default function App() {
   const [newEmp, setNewEmp] = useState({ name: "", email: "", roleTitle: "", department: "Training & Delivery", level: "L3 Advanced", rnrSummary: "" });
   const [newPrj, setNewPrj] = useState({ projectId: "", projectName: "", priority: "P1 Critical" });
   const [newTsk, setNewTsk] = useState({ taskCode: "", taskTitle: "", category: "BD & Client Proposals", customCategory: "" });
-  const [newLrn, setNewLrn] = useState({ moduleCode: "", domain: "STEM Hardware", topicTitle: "", targetProficiency: "Intermediate" });
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -419,6 +499,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem("ie_v3_employees", JSON.stringify(employees)); }, [employees]);
   useEffect(() => { localStorage.setItem("ie_v3_projects", JSON.stringify(projects)); }, [projects]);
   useEffect(() => { localStorage.setItem("ie_v3_tasks", JSON.stringify(tasks)); }, [tasks]);
+  useEffect(() => { localStorage.setItem("ie_v4_learned_aliases", JSON.stringify(learnedAliases)); }, [learnedAliases]);
   useEffect(() => { localStorage.setItem("ie_v3_learning", JSON.stringify(learningModules)); }, [learningModules]);
   useEffect(() => { localStorage.setItem("ie_v3_pulses", JSON.stringify(weeklyPulses)); }, [weeklyPulses]);
   useEffect(() => { localStorage.setItem("ie_v3_logs", JSON.stringify(dailyLogs)); }, [dailyLogs]);
@@ -708,9 +789,7 @@ export default function App() {
         weekLoggedHours: (weekMins / 60).toFixed(1),
         activeTasksList: activeTasks,
         doneTasksList: doneTasks.slice(-3),
-        todayLogsCount: todayLogs.length,
-        lastActiveProject: todayLogs.length > 0 ? todayLogs[todayLogs.length - 1].Project_ID : (activeTasks.length > 0 ? activeTasks[0].Project_ID : "Ready"),
-        lastActiveTask: todayLogs.length > 0 ? todayLogs[todayLogs.length - 1].Task_Code : (activeTasks.length > 0 ? activeTasks[0].Task_Code : "Standby")
+        todayLogsCount: todayLogs.length
       };
     });
   }, [employees, weeklyPulses, dailyLogs, currentMondayStr, todayStr]);
@@ -719,11 +798,10 @@ export default function App() {
     return dailyLogs.filter(l => normalizeDateStr(l.Date) === todayStr).slice().reverse();
   }, [dailyLogs, todayStr]);
 
-  // ================= VOICE & SMART COMMAND BAR HANDLERS =================
   const handleToggleVoice = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      showToast("Voice input works best in Chrome, Edge, or Safari.");
+      showToast("Voice input is supported in Chrome, Edge, and Safari.");
       return;
     }
 
@@ -741,7 +819,7 @@ export default function App() {
     recognition.onstart = () => setIsListening(true);
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
-      setSmartInput(prev => (prev ? `${prev} ${transcript}` : transcript));
+      setSmartInput(prev => (prev ? `${prev} and then ${transcript}` : transcript));
     };
     recognition.onerror = () => setIsListening(false);
     recognition.onend = () => setIsListening(false);
@@ -761,11 +839,10 @@ export default function App() {
         try {
           results = await geminiSmartParse(smartInput, geminiApiKey.trim(), projects, tasks, employees, activeEmployeeEmail, currentWorkboard);
         } catch (aiErr) {
-          console.log("Gemini fallback to local parser:", aiErr);
-          results = localSmartParse(smartInput, employees, currentWorkboard, activeEmployeeEmail);
+          results = localSmartParse(smartInput, employees, tasks, learnedAliases, currentWorkboard, activeEmployeeEmail);
         }
       } else {
-        results = localSmartParse(smartInput, employees, currentWorkboard, activeEmployeeEmail);
+        results = localSmartParse(smartInput, employees, tasks, learnedAliases, currentWorkboard, activeEmployeeEmail);
       }
       setParsedPreviews(results);
     } finally {
@@ -778,8 +855,32 @@ export default function App() {
 
     const newPulsesBatch = [];
     const newLogsBatch = [];
+    const newlyMintedTasks = [];
 
     parsedPreviews.forEach(item => {
+      const alreadyExists = tasks.some(t => t.Task_Code === item.taskCode) || newlyMintedTasks.some(t => t.Task_Code === item.taskCode);
+      if (item.isNewTask && !alreadyExists) {
+        const mintedEntry = {
+          Task_Code: item.taskCode.toUpperCase().trim(),
+          Task_Title: item.newTaskTitle || item.title,
+          Category: item.newTaskCategory || "Operations & Supply Chain",
+          Aliases: item.triggerToken || item.title.toLowerCase()
+        };
+        newlyMintedTasks.push(mintedEntry);
+        try {
+          fetch(APPS_SCRIPT_URL, {
+            method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({
+              action: "createTask",
+              taskCode: mintedEntry.Task_Code,
+              taskTitle: mintedEntry.Task_Title,
+              category: mintedEntry.Category,
+              aliases: mintedEntry.Aliases
+            })
+          });
+        } catch (err) {}
+      }
+
       const assignees = item.collaborators?.length > 0 ? item.collaborators : [activeEmployeeEmail];
       const collabStr = assignees.join(", ");
 
@@ -850,7 +951,6 @@ export default function App() {
             });
           } catch (err) {}
         } else {
-          // Create completed/active card on workboard AND log time
           const newPulseId = "TSK-" + Date.now() + "-" + Math.floor(Math.random() * 10000);
           const createdCard = {
             Pulse_ID: newPulseId,
@@ -919,6 +1019,9 @@ export default function App() {
       }
     });
 
+    if (newlyMintedTasks.length > 0) {
+      setTasks(prev => [...prev, ...newlyMintedTasks]);
+    }
     if (newPulsesBatch.length > 0) {
       setWeeklyPulses(prev => [...prev, ...newPulsesBatch]);
       try {
@@ -928,17 +1031,15 @@ export default function App() {
         });
       } catch (err) {}
     }
-
     if (newLogsBatch.length > 0) {
       setDailyLogs(prev => [...prev, ...newLogsBatch]);
     }
 
-    showToast(`✨ Processed ${parsedPreviews.length} smart action(s) into your workspace!`);
+    showToast(`Approved & saved ${parsedPreviews.length} item(s)${newlyMintedTasks.length > 0 ? ` + minted ${newlyMintedTasks.length} new task code(s)` : ""}!`);
     setParsedPreviews([]);
     setSmartInput("");
   };
 
-  // Manual Multi-Row Handlers
   const handleAddDraftRow = () => {
     setDraftRows(prev => [
       ...prev,
@@ -965,10 +1066,7 @@ export default function App() {
   const handleCommitBatchToBucket = async (e) => {
     e.preventDefault();
     const validRows = draftRows.filter(r => r.title.trim() !== "");
-    if (validRows.length === 0) {
-      showToast("Please enter a deliverable description.");
-      return;
-    }
+    if (validRows.length === 0) return;
 
     setIsAddingBatch(true);
     const assignees = selectedCollaborators.length > 0 ? selectedCollaborators : [activeEmployeeEmail];
@@ -1164,12 +1262,11 @@ export default function App() {
             </div>
             <div>
               <span className="font-bold text-base tracking-tight text-slate-900">IE Goal Tracker</span>
-              {!isCompactMobile && <span className="text-[11px] text-slate-500 block">Minimalist Voice & Focus OS</span>}
+              {!isCompactMobile && <span className="text-[11px] text-slate-500 block">Multi-Task Voice & Focus OS</span>}
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Mobile / Web Layout Toggle Button */}
             {!isMobileScreen && (
               <button
                 onClick={() => setForceMobilePreview(!forceMobilePreview)}
@@ -1183,7 +1280,7 @@ export default function App() {
 
             <button
               onClick={() => setShowApiKeyModal(true)}
-              title="Configure Optional Gemini AI Key"
+              title="Optional Gemini AI Key"
               className={`p-1.5 rounded-lg border transition ${geminiApiKey ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-white border-slate-200 text-slate-500 hover:text-slate-800"}`}
             >
               <Key className="h-3.5 w-3.5" />
@@ -1246,7 +1343,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Toast Alert */}
       {toastMessage && (
         <div className="max-w-md mx-auto mt-3 px-4 py-2 bg-slate-900 text-white rounded-full text-xs font-medium flex items-center gap-2 shadow-lg z-50">
           <CheckCircle className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
@@ -1254,14 +1350,14 @@ export default function App() {
         </div>
       )}
 
-      {/* ================= UNIFIED VOICE & AI SMART COMMAND BAR ================= */}
+      {/* ================= MULTI-TASK VOICE & TEXT SMART COMMAND BAR ================= */}
       <div className="max-w-6xl mx-auto px-4 pt-5 w-full">
         <div className="bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600 flex items-center gap-1.5">
-              <Wand2 className="h-3.5 w-3.5" /> Voice & Text Smart Command Bar
+              <Wand2 className="h-3.5 w-3.5" /> Multi-Task Voice & Text Command Bar
               <span className="text-slate-400 font-normal hidden sm:inline">
-                — Speak or type to add tasks OR log completed hours automatically
+                — Speak 2 or 3 tasks together; system splits, matches or auto-mints codes for 1-click approval
               </span>
             </span>
             <button
@@ -1277,7 +1373,7 @@ export default function App() {
             <button
               type="button"
               onClick={handleToggleVoice}
-              title={isListening ? "Stop listening" : "Speak task or time log"}
+              title={isListening ? "Stop listening" : "Speak one or multiple tasks"}
               className={`p-2.5 rounded-xl border transition shrink-0 flex items-center justify-center ${
                 isListening 
                   ? "bg-rose-500 text-white border-rose-600 animate-pulse shadow-md" 
@@ -1293,8 +1389,8 @@ export default function App() {
               onChange={(e) => setSmartInput(e.target.value)}
               placeholder={
                 isCompactMobile
-                  ? 'Say "2h on AMT School Expo" or "Add Dexter BOM"...'
-                  : 'Speak or type: e.g. "Spent 2h with Jay on AMT School Expo" or "Add task: Finish CSR proposal"'
+                  ? 'Say "2h on AMT Expo and then 45m on Dexter BOM"...'
+                  : 'Speak multiple tasks: e.g. "2h on AMT School Expo, and then 45m on Dexter BOM, also add CSR proposal"'
               }
               className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-indigo-500 focus:outline-none transition"
             />
@@ -1304,27 +1400,31 @@ export default function App() {
               disabled={isParsingAI || !smartInput.trim()}
               className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shrink-0 shadow-sm transition"
             >
-              <span>{isParsingAI ? "Sorting..." : "Auto-Bucket"}</span>
+              <span>{isParsingAI ? "Splitting..." : "Split & Preview"}</span>
               <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </form>
 
-          {/* Smart Parsed Preview Pills (Editable Before Confirmation) */}
+          {/* Multi-Task Split Preview Cards (Editable + 1-Click Approve All) */}
           {parsedPreviews.length > 0 && (
             <div className="mt-3 pt-3 border-t border-slate-100 space-y-2.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-slate-700">
-                  Auto-Categorized Preview ({parsedPreviews[0]?.engine}):
+                <span className="font-semibold text-slate-800">
+                  Split into {parsedPreviews.length} Ready-to-Approve Task(s) ({parsedPreviews[0]?.engine}):
                 </span>
                 <button onClick={() => setParsedPreviews([])} className="text-slate-400 hover:text-slate-600">
-                  Clear
+                  Clear All
                 </button>
               </div>
 
               <div className="space-y-2">
                 {parsedPreviews.map((item, idx) => (
-                  <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                  <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
                     <div className="flex flex-wrap items-center gap-1.5 flex-1">
+                      <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">
+                        #{idx + 1}
+                      </span>
+
                       {/* Action Type Selector */}
                       <select
                         value={item.intent}
@@ -1354,13 +1454,29 @@ export default function App() {
                         {projects.map(prj => <option key={prj.Project_ID} value={prj.Project_ID}>{prj.Project_ID}</option>)}
                       </select>
 
-                      {/* Task Selector */}
+                      {/* Task Selector (Shows Auto-Minted New Code or Existing Catalog + Learns Synonym if Reassigned) */}
                       <select
                         value={item.taskCode}
-                        onChange={(e) => setParsedPreviews(prev => prev.map((p, i) => i === idx ? { ...p, taskCode: e.target.value } : p))}
-                        className="bg-white border border-slate-200 text-slate-800 font-mono text-[11px] px-2 py-1 rounded-md"
+                        onChange={(e) => {
+                          const chosenCode = e.target.value;
+                          if (item.triggerToken) {
+                            setLearnedAliases(prev => ({
+                              ...prev,
+                              [chosenCode]: Array.from(new Set([...(prev[chosenCode] || []), item.triggerToken]))
+                            }));
+                          }
+                          setParsedPreviews(prev => prev.map((p, i) => i === idx ? { ...p, taskCode: chosenCode, isNewTask: false } : p));
+                        }}
+                        className={`font-mono text-[11px] px-2 py-1 rounded-md border ${
+                          item.isNewTask ? "bg-amber-50 text-amber-800 border-amber-300 font-bold" : "bg-white border-slate-200 text-slate-800"
+                        }`}
                       >
-                        {tasks.map(t => <option key={t.Task_Code} value={t.Task_Code}>{t.Task_Code} ({t.Task_Title.slice(0, 18)})</option>)}
+                        {item.isNewTask && (
+                          <option value={item.taskCode}>✨ NEW: {item.taskCode} ({item.newTaskTitle})</option>
+                        )}
+                        {tasks.map(t => (
+                          <option key={t.Task_Code} value={t.Task_Code}>{t.Task_Code} ({t.Task_Title.slice(0, 20)})</option>
+                        ))}
                       </select>
 
                       {/* Editable Deliverable Title */}
@@ -1368,12 +1484,12 @@ export default function App() {
                         type="text"
                         value={item.title}
                         onChange={(e) => setParsedPreviews(prev => prev.map((p, i) => i === idx ? { ...p, title: e.target.value } : p))}
-                        className="flex-1 min-w-[160px] bg-white border border-slate-200 rounded-md px-2 py-1 text-slate-900 font-medium"
+                        className="flex-1 min-w-[150px] bg-white border border-slate-200 rounded-md px-2 py-1 text-slate-900 font-medium"
                       />
                     </div>
 
-                    {/* Duration & Progress Controls */}
-                    <div className="flex items-center gap-2">
+                    {/* Duration, Progress & Remove Item */}
+                    <div className="flex items-center gap-1.5 self-end sm:self-center">
                       {item.intent !== "ADD_TASK" && (
                         <div className="flex items-center gap-1 bg-white border border-slate-200 px-2 py-1 rounded-md">
                           <Clock className="h-3 w-3 text-amber-500" />
@@ -1383,7 +1499,7 @@ export default function App() {
                             step="5"
                             value={item.minutes}
                             onChange={(e) => setParsedPreviews(prev => prev.map((p, i) => i === idx ? { ...p, minutes: Number(e.target.value) } : p))}
-                            className="w-12 text-right font-mono font-bold text-slate-800 focus:outline-none"
+                            className="w-11 text-right font-mono font-bold text-slate-800 focus:outline-none"
                           />
                           <span className="text-[10px] text-slate-400">m</span>
                         </div>
@@ -1397,11 +1513,19 @@ export default function App() {
                             step="10"
                             value={item.progress}
                             onChange={(e) => setParsedPreviews(prev => prev.map((p, i) => i === idx ? { ...p, progress: Number(e.target.value) } : p))}
-                            className="w-10 text-right font-mono font-bold text-emerald-600 focus:outline-none"
+                            className="w-9 text-right font-mono font-bold text-emerald-600 focus:outline-none"
                           />
                           <span className="text-[10px] text-slate-400">%</span>
                         </div>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => setParsedPreviews(prev => prev.filter((_, i) => i !== idx))}
+                        className="p-1 text-slate-400 hover:text-rose-500"
+                        title="Remove this split task"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -1413,7 +1537,7 @@ export default function App() {
                   onClick={handleConfirmSmartPreviews}
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-xs flex items-center gap-1.5 shadow-sm"
                 >
-                  <Check className="h-3.5 w-3.5" /> Confirm & Save All ({parsedPreviews.length})
+                  <Check className="h-3.5 w-3.5" /> Approve & Save All ({parsedPreviews.length})
                 </button>
               </div>
             </div>
@@ -1519,7 +1643,6 @@ export default function App() {
               )}
             </div>
 
-            {/* Company View Tabs */}
             <div className="flex border-b border-slate-200 text-xs sm:text-sm gap-5 overflow-x-auto">
               <button onClick={() => setCompanyTab("workload")} className={`pb-2.5 font-semibold transition flex items-center gap-1.5 shrink-0 ${companyTab === "workload" ? "text-indigo-600 border-b-2 border-indigo-600" : "text-slate-500 hover:text-slate-800"}`}>
                 <Users className="h-4 w-4" /> Team Buckets
@@ -1532,7 +1655,7 @@ export default function App() {
               </button>
               {!isCompactMobile && (
                 <button onClick={() => setCompanyTab("catalog")} className={`pb-2.5 font-semibold transition flex items-center gap-1.5 shrink-0 ${companyTab === "catalog" ? "text-indigo-600 border-b-2 border-indigo-600" : "text-slate-500 hover:text-slate-800"}`}>
-                  <LayoutGrid className="h-4 w-4" /> Catalog Manager
+                  <LayoutGrid className="h-4 w-4" /> Catalog ({tasks.length})
                 </button>
               )}
             </div>
@@ -1628,7 +1751,7 @@ export default function App() {
                   </div>
 
                   <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
-                    <h3 className="font-bold text-sm text-slate-900">Hours by Task Category</h3>
+                    <h3 className="font-bold text-sm text-slate-900">Hours by Task Code</h3>
                     {companyTaskBreakdown.length === 0 ? (
                       <p className="text-xs text-slate-400 py-4">No hours logged in this window.</p>
                     ) : (
@@ -1672,22 +1795,32 @@ export default function App() {
 
             {companyTab === "catalog" && (
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                   <div>
-                    <h3 className="font-bold text-sm text-slate-900">Master Catalog Sync</h3>
-                    <p className="text-xs text-slate-500">Push default projects and task categories to Google Sheets</p>
+                    <h3 className="font-bold text-sm text-slate-900">Active Task Catalog & Auto-Minted Codes ({tasks.length})</h3>
+                    <p className="text-xs text-slate-500">Includes pre-populated tasks plus any new codes auto-created via Voice/Text</p>
                   </div>
                   <button onClick={handleSeedCatalogToSheet} className="px-3.5 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-semibold">
                     ⚡ Sync Catalog to Sheet
                   </button>
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-96 overflow-y-auto">
+                  {tasks.map(t => (
+                    <div key={t.Task_Code} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs flex justify-between items-center">
+                      <div>
+                        <span className="font-mono font-bold text-indigo-600">[{t.Task_Code}]</span>{" "}
+                        <span className="font-medium text-slate-900">{t.Task_Title}</span>
+                        <span className="block text-[10px] text-slate-500">{t.Category}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
         ) : (
-          /* ================= EMPLOYEE COCKPIT VIEW (WEB & MOBILE ADAPTIVE) ================= */
+          /* ================= EMPLOYEE COCKPIT VIEW ================= */
           <div className="space-y-5">
-            {/* Compact Employee Header */}
             <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center justify-between gap-3 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="h-11 w-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-lg">
@@ -1720,7 +1853,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Desktop Sub-Tabs (Hidden on Mobile because Mobile uses Bottom Bar) */}
             {!isCompactMobile && (
               <div className="flex border-b border-slate-200 text-xs sm:text-sm gap-6">
                 <button onClick={() => setEmployeeTab("workboard")} className={`pb-2.5 font-semibold transition flex items-center gap-1.5 ${employeeTab === "workboard" ? "text-indigo-600 border-b-2 border-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>
@@ -1735,7 +1867,6 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB 1: MINIMALIST TASK CARDS */}
             {employeeTab === "workboard" && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-2">
@@ -1753,7 +1884,7 @@ export default function App() {
 
                 {currentWorkboard.length === 0 ? (
                   <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs">
-                    Your bucket is clear. Use the voice/text bar above to add tasks or log work.
+                    Your bucket is clear. Speak or type 1, 2, or 3 tasks into the command bar above!
                   </div>
                 ) : (
                   <div className={`grid grid-cols-1 ${isCompactMobile ? "" : "md:grid-cols-2"} gap-3.5`}>
@@ -1808,7 +1939,6 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB 2: PERSONAL FOCUS BAR GRAPH */}
             {employeeTab === "focus" && (
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -1862,7 +1992,6 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB 3: EDITABLE R&R */}
             {employeeTab === "rnr" && (
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
                 <div className="flex justify-between items-center">
@@ -1925,7 +2054,7 @@ export default function App() {
         </nav>
       )}
 
-      {/* MODAL 1: IN-CARD LOGGING SLIDERS (LIGHT THEME) */}
+      {/* MODAL 1: IN-CARD LOGGING SLIDERS */}
       {activeLoggingItem && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-5 shadow-xl space-y-4">
@@ -1994,7 +2123,7 @@ export default function App() {
               <button onClick={() => setShowApiKeyModal(false)} className="text-slate-400"><X className="h-4 w-4" /></button>
             </div>
             <p className="text-slate-600 leading-relaxed">
-              By default, the Smart Bar uses the <strong>Instant Local Keyword Engine</strong> (zero API key required). Paste a free <strong>Gemini API Key</strong> below to enable deep natural language sentence splitting via Gemini 2.5 Flash.
+              The <strong>Smart Multi-Task Local Engine</strong> splits multiple spoken tasks and auto-mints new codes out of the box with zero API keys. Optionally paste a <strong>Gemini API Key</strong> below if you want cloud LLM parsing.
             </p>
             <input
               type="password"
@@ -2007,7 +2136,7 @@ export default function App() {
               className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-slate-900 font-mono"
             />
             <div className="flex justify-end">
-              <button onClick={() => { setShowApiKeyModal(false); showToast("Smart Engine preference saved!"); }} className="px-4 py-2 bg-slate-900 text-white font-semibold rounded-xl">
+              <button onClick={() => { setShowApiKeyModal(false); showToast("Engine preference saved!"); }} className="px-4 py-2 bg-slate-900 text-white font-semibold rounded-xl">
                 Done
               </button>
             </div>
