@@ -6,12 +6,11 @@ import {
   Edit3, Rocket, Check, X, Sun, Moon, Table, 
   CheckSquare, Square, ChevronRight, ChevronDown, 
   AlertCircle, ListChecks, Filter, Tag, Calendar, 
-  Award, TrendingUp, HelpCircle
+  Award, TrendingUp, Settings, Sliders
 } from 'lucide-react';
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz5BOqMU1e5maZBs2xyWRMPxWIjiJvZbRvJs1GvRgZamk6tKQKbDOdSWTQzp5ut9KL-/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz4v1XX9-m0Zu_xEgEzyeCI361wydctuHupDCxgPEhfDWuqgD-AtVrESJ-s6cE4kA2xtA/exec";
 
-// Master Operational Pillars
 const DEFAULT_PROJECTS = [
   { Project_ID: "PRJ-DEXTER", Project_Name: "Dexter Box", Full_Name: "Dexter Box Science Kits" },
   { Project_ID: "PRJ-MAKER", Project_Name: "Maker Lab", Full_Name: "Maker Lab & School Studios" },
@@ -21,8 +20,7 @@ const DEFAULT_PROJECTS = [
   { Project_ID: "PRJ-ADMIN", Project_Name: "Admin & Ops", Full_Name: "Office Admin, HR & Operations" }
 ];
 
-// Master Tag Library (Replacing rigid task codes)
-const MASTER_TAG_LIBRARY = [
+const DEFAULT_TAGS = [
   "#Meeting",
   "#SchoolVisit",
   "#ClientFollowup",
@@ -102,7 +100,6 @@ function calculateUniqueDayStreak(userLogs) {
   return streak;
 }
 
-// Get Monday of any given date
 function getMondayOfDate(dStr) {
   const d = new Date(dStr);
   const day = d.getDay();
@@ -113,21 +110,25 @@ function getMondayOfDate(dStr) {
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("ie_theme") || "light");
-  // 4 Core Tabs in Exact Requested Order
   const [activeTab, setActiveTab] = useState("my_tasks"); // 'my_tasks' | 'learning' | 'monthly_review' | 'company_master'
   const [activeEmployeeEmail, setActiveEmployeeEmail] = useState(() => localStorage.getItem("ie_v3_active_emp") || "");
 
   useEffect(() => { localStorage.setItem("ie_theme", theme); }, [theme]);
 
+  // Master Data Lists (Synced with Sheet + Local Storage)
   const [employees, setEmployees] = useState(() => JSON.parse(localStorage.getItem("ie_v3_employees") || "[]"));
   const [projects, setProjects] = useState(() => mergeById(JSON.parse(localStorage.getItem("ie_v3_projects") || "[]"), DEFAULT_PROJECTS, "Project_ID"));
+  const [tags, setTags] = useState(() => {
+    const saved = localStorage.getItem("ie_v8_tags");
+    return saved ? JSON.parse(saved) : DEFAULT_TAGS;
+  });
   const [weeklyPulses, setWeeklyPulses] = useState(() => JSON.parse(localStorage.getItem("ie_v3_pulses") || "[]"));
   const [dailyLogs, setDailyLogs] = useState(() => JSON.parse(localStorage.getItem("ie_v3_logs") || "[]"));
 
   const todayStr = getTodayStr();
   const currentMondayStr = getCurrentMondayStr();
 
-  // Create Task Form State
+  // Create Task Form
   const [quickTitle, setQuickTitle] = useState("");
   const [quickProject, setQuickProject] = useState("PRJ-MAKER");
   const [quickTag, setQuickTag] = useState("#General");
@@ -136,43 +137,44 @@ export default function App() {
   const [selectedCollaborators, setSelectedCollaborators] = useState([]);
   const [showCollabPicker, setShowCollabPicker] = useState(false);
 
-  // Expanded Subtask Drawers
+  // Learning Bucket Form (Add to queue, log hours later!)
+  const [newLearningTopic, setNewLearningTopic] = useState("");
+  const [newLearningTag, setNewLearningTag] = useState("#R&D");
+
+  // Expanded Subtasks
   const [expandedRowIds, setExpandedRowIds] = useState({});
   const [newSubtaskInputs, setNewSubtaskInputs] = useState({});
   const [showCompletedRows, setShowCompletedRows] = useState(false);
+  const [showCompletedLearning, setShowCompletedLearning] = useState(false);
 
-  // Guarded Completion Modal/Inline Prompt (Cannot complete with 0h logged)
-  const [completionGuardTarget, setCompletionGuardTarget] = useState(null); // task row waiting for hours
+  // Guarded Completion (No 0-Hour completions)
+  const [completionGuardTarget, setCompletionGuardTarget] = useState(null);
   const [guardDurationInput, setGuardDurationInput] = useState(60);
 
-  // In-Place Cell Editing State
-  const [editingCell, setEditingCell] = useState(null); // { pulseId, field }
+  // In-Place Cell Editing
+  const [editingCell, setEditingCell] = useState(null);
 
-  // Streak & GP Popovers
+  // Modals & Drawers
   const [showStreakModal, setShowStreakModal] = useState(false);
   const [showGpModal, setShowGpModal] = useState(false);
+  const [showLibraryManager, setShowLibraryManager] = useState(false); // Tag & Project Manager Drawer
+  const [showEmpModal, setShowEmpModal] = useState(false);
 
-  // Free-Form Learning Log Form
-  const [lrnTopic, setLrnTopic] = useState("");
-  const [lrnTag, setLrnTag] = useState("#Electronics");
-  const [lrnMinutes, setLrnMinutes] = useState(45);
+  // Library Manager New Inputs
+  const [newTagInput, setNewTagInput] = useState("");
+  const [newPrjCode, setNewPrjCode] = useState("");
+  const [newPrjName, setNewPrjName] = useState("");
 
-  // Monthly & Goal Review State
+  // Review & R&R
   const [reviewPeriod, setReviewPeriod] = useState("MONTH");
   const [isEditingRnR, setIsEditingRnR] = useState(false);
   const [rnrDraft, setRnrDraft] = useState("");
 
-  // Company Master View Filters
+  // Company Filters
   const [companyFilterProject, setCompanyFilterProject] = useState("ALL");
   const [companyFilterMember, setCompanyFilterMember] = useState("ALL");
   const [companyFilterStatus, setCompanyFilterStatus] = useState("ALL");
   const [expandedMasterKeys, setExpandedMasterKeys] = useState({});
-
-  // Admin Modals
-  const [showEmpModal, setShowEmpModal] = useState(false);
-  const [showPrjModal, setShowPrjModal] = useState(false);
-  const [newEmp, setNewEmp] = useState({ name: "", email: "", roleTitle: "", department: "Training & Delivery", level: "L3 Advanced", rnrSummary: "" });
-  const [newPrj, setNewPrj] = useState({ projectId: "", projectName: "", priority: "P1 Critical" });
 
   const [isLoading, setIsLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
@@ -184,6 +186,7 @@ export default function App() {
 
   useEffect(() => { localStorage.setItem("ie_v3_employees", JSON.stringify(employees)); }, [employees]);
   useEffect(() => { localStorage.setItem("ie_v3_projects", JSON.stringify(projects)); }, [projects]);
+  useEffect(() => { localStorage.setItem("ie_v8_tags", JSON.stringify(tags)); }, [tags]);
   useEffect(() => { localStorage.setItem("ie_v3_pulses", JSON.stringify(weeklyPulses)); }, [weeklyPulses]);
   useEffect(() => { localStorage.setItem("ie_v3_logs", JSON.stringify(dailyLogs)); }, [dailyLogs]);
   useEffect(() => {
@@ -203,7 +206,9 @@ export default function App() {
           setEmployees(prev => mergeById(data.employees, prev, "Email"));
           if (!activeEmployeeEmail) setActiveEmployeeEmail(data.employees[0].Email);
         }
-        setProjects(prev => mergeById(data.projects || [], prev, "Project_ID"));
+        if (data.projects?.length > 0) {
+          setProjects(prev => mergeById(data.projects, prev, "Project_ID"));
+        }
         if (data.weeklyPulses) {
           setWeeklyPulses(prev => {
             const remoteMap = new Map();
@@ -228,10 +233,10 @@ export default function App() {
   const currentEmp = employees.find(e => (e.Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase()) || {
     Name: "Team Member",
     Email: activeEmployeeEmail || "",
-    Role_Title: "Click '+ Member' to Onboard",
+    Role_Title: "Onboard in Top Bar",
     Department: "Infinite Engineers",
     Level: "L3",
-    "R&R_Summary": "Click 'Edit' to list your monthly core responsibilities and KRAs."
+    "R&R_Summary": "Click 'Edit' to document your monthly core responsibilities and KRAs."
   };
 
   useEffect(() => { setRnrDraft(currentEmp["R&R_Summary"] || ""); }, [currentEmp]);
@@ -242,13 +247,18 @@ export default function App() {
 
   const currentStreak = useMemo(() => calculateUniqueDayStreak(empDailyLogs), [empDailyLogs]);
 
-  // Active & Completed rows for the logged-in user
+  // Tasks Filter (Separating Standard Work from Learning Bucket)
   const empAllPulses = useMemo(() => {
     return weeklyPulses.filter(p => (p.Emp_Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase());
   }, [weeklyPulses, activeEmployeeEmail]);
 
-  const activeRows = useMemo(() => empAllPulses.filter(p => Number(p.Auto_Task_Hours || 0) < 100), [empAllPulses]);
-  const completedRows = useMemo(() => empAllPulses.filter(p => Number(p.Auto_Task_Hours || 0) >= 100), [empAllPulses]);
+  // Standard Work Tasks
+  const activeTasks = useMemo(() => empAllPulses.filter(p => p.Project_ID !== "UPSKILLING" && Number(p.Auto_Task_Hours || 0) < 100), [empAllPulses]);
+  const completedTasks = useMemo(() => empAllPulses.filter(p => p.Project_ID !== "UPSKILLING" && Number(p.Auto_Task_Hours || 0) >= 100), [empAllPulses]);
+
+  // Dedicated Learning Bucket (Can plan topics, then log hours later!)
+  const activeLearningItems = useMemo(() => empAllPulses.filter(p => p.Project_ID === "UPSKILLING" && Number(p.Auto_Task_Hours || 0) < 100), [empAllPulses]);
+  const completedLearningItems = useMemo(() => empAllPulses.filter(p => p.Project_ID === "UPSKILLING" && Number(p.Auto_Task_Hours || 0) >= 100), [empAllPulses]);
 
   const getProjectLabel = (prjId) => {
     const found = projects.find(p => p.Project_ID === prjId);
@@ -260,13 +270,12 @@ export default function App() {
     return found ? found.Name : email;
   };
 
-  // ================= TRANSPARENT INDIVIDUAL GP FORMULA & LEDGER =================
+  // ================= PERSONAL GP LEDGER =================
   const personalGpData = useMemo(() => {
     let totalGp = 0;
     const history = [];
 
-    // 1. Task Completions & On-Time Bonuses
-    completedRows.forEach(row => {
+    completedTasks.forEach(row => {
       totalGp += 50;
       history.push({ date: normalizeDateStr(row.Completed_Date) || todayStr, title: `Completed "${row.Monday_Commitment}"`, gp: 50, tag: "Task" });
       const compD = normalizeDateStr(row.Completed_Date);
@@ -277,7 +286,6 @@ export default function App() {
       }
     });
 
-    // 2. Effort Execution (5 GP per 15 mins) & Learning (15 GP per 30 mins)
     empDailyLogs.forEach(l => {
       const rt = Number(l.Task_Hours || 0);
       const tMins = rt > 24 ? rt : Math.round(rt * 60);
@@ -291,15 +299,15 @@ export default function App() {
       if (lMins > 0) {
         const lrnGp = Math.round((lMins / 30) * 15);
         totalGp += lrnGp;
-        history.push({ date: normalizeDateStr(l.Date), title: `Learning: ${l.Learning_Module_Code || l.Notes} (${lMins}m)`, gp: lrnGp, tag: "Upskilling" });
+        history.push({ date: normalizeDateStr(l.Date), title: `Learning: ${l.Notes} (${lMins}m)`, gp: lrnGp, tag: "Upskilling" });
       }
     });
 
     history.sort((a, b) => b.date.localeCompare(a.date));
     return { totalGp, history: history.slice(0, 15) };
-  }, [completedRows, empDailyLogs, todayStr]);
+  }, [completedTasks, empDailyLogs, todayStr]);
 
-  // ================= WEEKLY TEAM LAUNCH TOWER ENGINE (WEEK-BY-WEEK HEIGHT) =================
+  // ================= DYNAMIC WEEKLY TOWER RECORD ENGINE =================
   const towerData = useMemo(() => {
     const weeklyPointsMap = {};
 
@@ -335,20 +343,19 @@ export default function App() {
     const delta = currentWkPoints - lastWkPoints;
 
     const allScores = Object.values(weeklyPointsMap);
+    // Highest Record is computed dynamically from team history (defaults to 1,500 target if first sprint)
     const recordHeight = allScores.length > 0 ? Math.max(...allScores, 1500) : 1500;
     const last4 = allScores.slice(-4);
     const rollingAvg = last4.length > 0 ? Math.round(last4.reduce((a, b) => a + b, 0) / last4.length) : currentWkPoints;
 
-    // Generic Clean Milestones
     let currentTier = "Base (Level 1)";
-    if (currentWkPoints >= 2500) currentTier = "Peak / Summit Level";
+    if (currentWkPoints >= 2500) currentTier = "Peak Level";
     else if (currentWkPoints >= 1800) currentTier = "Tier 3 (Level 4)";
     else if (currentWkPoints >= 1000) currentTier = "Tier 2 (Level 3)";
     else if (currentWkPoints >= 500) currentTier = "Tier 1 (Level 2)";
 
     const heightPercent = Math.min(100, Math.round((currentWkPoints / 2500) * 100));
 
-    // Last 4 weeks bar data for comparison visual
     const historyBars = sortedWeeks.slice(-4).map(wk => ({
       weekMon: wk,
       points: weeklyPointsMap[wk],
@@ -368,11 +375,11 @@ export default function App() {
     };
   }, [weeklyPulses, dailyLogs, currentMondayStr, todayStr]);
 
-  // ================= COMPANY MASTER SHEET AGGREGATION & DYNAMIC METRICS =================
+  // ================= COMPANY MASTER VIEW DATA =================
   const companyMasterTasks = useMemo(() => {
     const groupedMap = new Map();
 
-    weeklyPulses.forEach(p => {
+    weeklyPulses.filter(p => p.Project_ID !== "UPSKILLING").forEach(p => {
       const key = `${(p.Project_ID || "").toUpperCase()}::${(p.Monday_Commitment || "").trim().toLowerCase()}`;
       const existing = groupedMap.get(key);
       const mins = Number(p.Auto_Learning_Hours || 0);
@@ -418,7 +425,6 @@ export default function App() {
     });
   }, [companyMasterTasks, companyFilterProject, companyFilterMember, companyFilterStatus, todayStr]);
 
-  // Context-Aware KPI Cards (Changes to reflect individual when a person is filtered!)
   const masterKpiStats = useMemo(() => {
     const list = companyFilterMember === "ALL" 
       ? companyMasterTasks 
@@ -443,7 +449,7 @@ export default function App() {
     };
   }, [companyMasterTasks, companyFilterMember, todayStr, employees]);
 
-  // ================= MONTHLY & GOAL REVIEW ANALYTICS =================
+  // ================= MONTHLY & GOAL REVIEW DATA =================
   const reviewMetrics = useMemo(() => {
     const currentMonthPrefix = todayStr.slice(0, 7);
     const periodLogs = empDailyLogs.filter(l => {
@@ -476,8 +482,8 @@ export default function App() {
       percent: totalMins > 0 ? Math.round((mins / totalMins) * 100) : 0
     })).sort((a, b) => Number(b.hours) - Number(a.hours));
 
-    const totalGoals = empAllPulses.length;
-    const completedGoals = completedRows.length;
+    const totalGoals = empAllPulses.filter(p => p.Project_ID !== "UPSKILLING").length;
+    const completedGoals = completedTasks.length;
     const goalCompletionRate = totalGoals > 0 ? Math.round((completedGoals / totalGoals) * 100) : 0;
 
     return {
@@ -486,13 +492,12 @@ export default function App() {
       learningHours: (learningMins / 60).toFixed(1),
       totalGoals,
       completedGoals,
-      activeGoals: activeRows.length,
       goalCompletionRate,
       tagBars
     };
-  }, [empDailyLogs, reviewPeriod, currentMondayStr, todayStr, empAllPulses, completedRows, activeRows]);
+  }, [empDailyLogs, reviewPeriod, currentMondayStr, todayStr, empAllPulses, completedTasks]);
 
-  // ================= SUB-TASK ENGINE & COLLABORATOR SYNC =================
+  // ================= SUB-TASK ENGINE & AUTO PROGRESS =================
   const syncSubtasksAndProgress = (rowItem, updatedSubtasks) => {
     const totalSub = updatedSubtasks.length;
     const doneSub = updatedSubtasks.filter(s => s.done).length;
@@ -502,7 +507,6 @@ export default function App() {
     const targetTitle = (rowItem.Monday_Commitment || "").trim().toLowerCase();
     const targetPrj = (rowItem.Project_ID || "").toUpperCase();
 
-    // Check guard: if hitting 100% but 0h logged, trigger prompt!
     if (autoProgress >= 100 && Number(rowItem.Auto_Learning_Hours || 0) === 0) {
       setCompletionGuardTarget({ ...rowItem, pendingSubtasks: updatedSubtasks });
       return;
@@ -559,12 +563,12 @@ export default function App() {
     syncSubtasksAndProgress(rowItem, updated);
   };
 
-  // ================= GUARDED TIME LOGGING & COMPLETION =================
+  // ================= 1-TAP TIME LOGGING ON ROWS (WORKS FOR BOTH TASKS & LEARNING) =================
   const handleQuickLogTimeOnRow = (rowItem, addMinutes, forceDone = false) => {
+    const isLearning = rowItem.Project_ID === "UPSKILLING";
     const currentMins = Number(rowItem.Auto_Learning_Hours || 0) + addMinutes;
 
-    // GUARD: If trying to mark done but total hours is 0, require duration input!
-    if (forceDone && currentMins === 0) {
+    if (forceDone && currentMins === 0 && !isLearning) {
       setCompletionGuardTarget(rowItem);
       return;
     }
@@ -603,17 +607,17 @@ export default function App() {
         Date: todayStr,
         Emp_Email: activeEmployeeEmail,
         Project_ID: rowItem.Project_ID,
-        Task_Code: rowItem.Task_Code || "#General",
-        Task_Hours: addMinutes,
-        Learning_Module_Code: "None",
-        Learning_Hours: 0,
+        Task_Code: rowItem.Task_Code || (isLearning ? "#Learning" : "#General"),
+        Task_Hours: isLearning ? 0 : addMinutes,
+        Learning_Module_Code: isLearning ? rowItem.Monday_Commitment : "None",
+        Learning_Hours: isLearning ? addMinutes : 0,
         Status: newProg >= 100 ? "Done" : "In Progress",
         Streak_Count: currentStreak || 1,
         Notes: rowItem.Monday_Commitment
       }]);
     }
 
-    showToast(forceDone ? `✓ Completed "${rowItem.Monday_Commitment}"!` : `🕒 Logged +${addMinutes}m`);
+    showToast(forceDone ? `✓ Completed "${rowItem.Monday_Commitment}"!` : `🕒 Added +${addMinutes}m to "${rowItem.Monday_Commitment}"`);
 
     try {
       fetch(APPS_SCRIPT_URL, {
@@ -623,7 +627,7 @@ export default function App() {
           pulseId: rowItem.Pulse_ID,
           email: activeEmployeeEmail,
           projectId: rowItem.Project_ID,
-          taskTag: rowItem.Task_Code || "#General",
+          taskTag: rowItem.Task_Code || (isLearning ? "#Learning" : "#General"),
           taskMinutes: addMinutes,
           progressPercent: newProg,
           subtasksJson: jsonStr,
@@ -635,7 +639,6 @@ export default function App() {
     } catch (err) {}
   };
 
-  // Resolve Guarded Completion Once User Picks Hours
   const handleResolveGuardedCompletion = (mins) => {
     if (!completionGuardTarget) return;
     const target = completionGuardTarget;
@@ -643,7 +646,6 @@ export default function App() {
     handleQuickLogTimeOnRow(target, Number(mins), true);
   };
 
-  // In-Place Row Attribute Editing (Saves directly to Sheet)
   const handleUpdateRowAttribute = (pulseId, field, value) => {
     setWeeklyPulses(prev => prev.map(p => p.Pulse_ID === pulseId ? { ...p, [field]: value } : p));
     setEditingCell(null);
@@ -661,7 +663,7 @@ export default function App() {
     } catch (err) {}
   };
 
-  // Add Task Row Submit
+  // Create Standard Task
   const handleCreateTaskRow = (e) => {
     e.preventDefault();
     if (!quickTitle.trim()) return;
@@ -712,41 +714,109 @@ export default function App() {
     } catch (err) {}
   };
 
-  // Free-Form Learning Submit
-  const handleLogLearning = (e) => {
+  // Add Item to Learning Bucket (Can log hours multiple times later!)
+  const handleCreateLearningItem = (e) => {
     e.preventDefault();
-    if (!lrnTopic.trim()) return;
+    if (!newLearningTopic.trim()) return;
 
-    const newLog = {
-      Log_ID: "LRN-" + Date.now(),
-      Date: todayStr,
-      Emp_Email: activeEmployeeEmail,
+    const newItem = {
+      Pulse_ID: `LRN-${Date.now()}`,
+      Created_Date: todayStr,
+      Emp_Email: activeEmployeeEmail.toLowerCase().trim(),
       Project_ID: "UPSKILLING",
-      Task_Code: lrnTag,
-      Task_Hours: 0,
-      Learning_Module_Code: lrnTopic.trim(),
-      Learning_Hours: Number(lrnMinutes),
-      Status: "Done",
-      Streak_Count: currentStreak || 1,
-      Notes: lrnTopic.trim()
+      Task_Code: newLearningTag || "#Learning",
+      Monday_Commitment: newLearningTopic.trim(),
+      Auto_Task_Hours: 0,
+      Auto_Learning_Hours: 0,
+      Friday_Outcome: "Self",
+      Status: "In Progress",
+      Target_Deadline: todayStr,
+      Completed_Date: "",
+      Collaborators: activeEmployeeEmail,
+      Subtasks_JSON: "[]",
+      subtasks: []
     };
 
-    setDailyLogs(prev => [...prev, newLog]);
-    setLrnTopic("");
-    showToast(`🎓 Logged ${lrnMinutes}m of learning! (+${Math.round((lrnMinutes / 30) * 15)} GP)`);
+    setWeeklyPulses(prev => [...prev, newItem]);
+    setNewLearningTopic("");
+    showToast(`Added "${newItem.Monday_Commitment}" to Learning Bucket!`);
 
     try {
       fetch(APPS_SCRIPT_URL, {
         method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({
-          action: "logLearningSession",
-          email: activeEmployeeEmail,
-          topicTitle: newLog.Learning_Module_Code,
-          skillTag: lrnTag,
-          learningMinutes: Number(lrnMinutes),
-          currentStreak: currentStreak || 1,
-          notes: newLog.Notes
-        })
+        body: JSON.stringify({ action: "addWorkboardBatch", items: [newItem] })
+      });
+    } catch (err) {}
+  };
+
+  // ================= TAG & PROJECT MANAGER ACTIONS =================
+  const handleAddNewTag = () => {
+    let t = newTagInput.trim();
+    if (!t) return;
+    if (!t.startsWith("#")) t = "#" + t;
+    if (tags.includes(t)) {
+      showToast("Tag already exists!");
+      return;
+    }
+    const updated = [...tags, t];
+    setTags(updated);
+    setNewTagInput("");
+    showToast(`Added tag ${t}`);
+
+    try {
+      fetch(APPS_SCRIPT_URL, {
+        method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: "saveTag", tag: t })
+      });
+    } catch (err) {}
+  };
+
+  const handleDeleteTag = (tagToDelete) => {
+    if (tags.length <= 1) return;
+    const updated = tags.filter(t => t !== tagToDelete);
+    setTags(updated);
+    showToast(`Deleted tag ${tagToDelete}`);
+
+    try {
+      fetch(APPS_SCRIPT_URL, {
+        method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: "deleteTag", tag: tagToDelete })
+      });
+    } catch (err) {}
+  };
+
+  const handleAddNewProject = () => {
+    if (!newPrjCode.trim() || !newPrjName.trim()) return;
+    const code = newPrjCode.toUpperCase().trim();
+    if (projects.some(p => p.Project_ID === code)) {
+      showToast("Project code exists!");
+      return;
+    }
+    const newP = { Project_ID: code, Project_Name: newPrjName.trim(), Full_Name: newPrjName.trim() };
+    const updated = [...projects, newP];
+    setProjects(updated);
+    setNewPrjCode("");
+    setNewPrjName("");
+    showToast(`Added project ${newP.Project_Name}`);
+
+    try {
+      fetch(APPS_SCRIPT_URL, {
+        method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: "createProject", projectId: newP.Project_ID, projectName: newP.Project_Name })
+      });
+    } catch (err) {}
+  };
+
+  const handleDeleteProject = (prjId) => {
+    if (projects.length <= 1) return;
+    const updated = projects.filter(p => p.Project_ID !== prjId);
+    setProjects(updated);
+    showToast(`Deleted project ${prjId}`);
+
+    try {
+      fetch(APPS_SCRIPT_URL, {
+        method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: "deleteProject", projectId: prjId })
       });
     } catch (err) {}
   };
@@ -770,7 +840,7 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Clickable Goal Points Pill (Opens Transparent Personal Ledger) */}
+            {/* Clickable Goal Points Pill */}
             <button
               type="button"
               onClick={() => setShowGpModal(true)}
@@ -781,7 +851,7 @@ export default function App() {
               <span>{personalGpData.totalGp} GP</span>
             </button>
 
-            {/* Clickable Streak Pill (Opens 14-Day Activity Heatmap) */}
+            {/* Clickable Streak Pill */}
             <button
               type="button"
               onClick={() => setShowStreakModal(true)}
@@ -792,7 +862,7 @@ export default function App() {
               <span>{currentStreak}d Streak</span>
             </button>
 
-            {/* User Switcher (Unrestricted for Testing) */}
+            {/* Active User Switcher */}
             {employees.length > 0 && (
               <select
                 value={activeEmployeeEmail}
@@ -805,14 +875,24 @@ export default function App() {
               </select>
             )}
 
+            {/* Manage Tags & Projects Drawer Button */}
+            <button
+              type="button"
+              onClick={() => setShowLibraryManager(true)}
+              title="Manage Projects & Tags"
+              className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1 transition ${isDark ? "bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"}`}
+            >
+              <Settings className="h-3.5 w-3.5 text-indigo-500" />
+              <span className="hidden sm:inline">Tags & Projects</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setShowEmpModal(true)}
               title="Add Team Member"
-              className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1 ${isDark ? "bg-slate-800 border-slate-700 text-slate-200" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"}`}
+              className={`p-1.5 rounded-lg border text-xs ${isDark ? "bg-slate-800 border-slate-700 text-slate-200" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"}`}
             >
               <UserPlus className="h-3.5 w-3.5 text-indigo-500" />
-              <span className="hidden sm:inline">+ Member</span>
             </button>
 
             <button
@@ -848,7 +928,7 @@ export default function App() {
         {/* 4 WORKBOOK TABS IN EXACT REQUESTED SEQUENCE */}
         <div className={`flex items-center justify-between border-b ${isDark ? "border-slate-800" : "border-slate-200"}`}>
           <div className="flex items-center gap-1 text-xs sm:text-sm overflow-x-auto">
-            {/* TAB 1 */}
+            {/* TAB 1: MY TASKS */}
             <button
               type="button"
               onClick={() => setActiveTab("my_tasks")}
@@ -858,10 +938,10 @@ export default function App() {
                   : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
-              <ListChecks className="h-4 w-4" /> 1. My Tasks & Sub-Tasks ({activeRows.length})
+              <ListChecks className="h-4 w-4" /> 1. My Tasks & Sub-Tasks ({activeTasks.length})
             </button>
 
-            {/* TAB 2 */}
+            {/* TAB 2: LEARNING LOG */}
             <button
               type="button"
               onClick={() => setActiveTab("learning")}
@@ -871,10 +951,10 @@ export default function App() {
                   : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
-              <GraduationCap className="h-4 w-4" /> 2. Learning Log
+              <GraduationCap className="h-4 w-4" /> 2. Learning Log ({activeLearningItems.length})
             </button>
 
-            {/* TAB 3 */}
+            {/* TAB 3: MONTHLY & GOAL REVIEW */}
             <button
               type="button"
               onClick={() => setActiveTab("monthly_review")}
@@ -887,7 +967,7 @@ export default function App() {
               <BarChart3 className="h-4 w-4" /> 3. Monthly & Goal Review
             </button>
 
-            {/* TAB 4 */}
+            {/* TAB 4: COMPANY MASTER VIEW */}
             <button
               type="button"
               onClick={() => setActiveTab("company_master")}
@@ -900,20 +980,12 @@ export default function App() {
               <Building2 className="h-4 w-4" /> 4. Company Master View
             </button>
           </div>
-
-          <button
-            type="button"
-            onClick={() => setShowPrjModal(true)}
-            className={`hidden sm:flex items-center gap-1 px-2.5 py-1 mb-1 rounded-lg text-xs border ${isDark ? "bg-slate-900 border-slate-800 text-slate-300" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
-          >
-            <FolderPlus className="h-3.5 w-3.5 text-indigo-500" /> + Project
-          </button>
         </div>
 
         {/* ================= TAB 1: MY TASKS & SUB-TASKS ================= */}
         {activeTab === "my_tasks" && (
           <div className="space-y-4">
-            {/* Task Entry Bar (Predictable Form - No Smart Add Voice Interference) */}
+            {/* Task Entry Bar */}
             <form onSubmit={handleCreateTaskRow} className={`p-3.5 rounded-2xl border shadow-sm space-y-2.5 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                 <div className="sm:col-span-4">
@@ -953,7 +1025,7 @@ export default function App() {
                     onChange={(e) => setQuickTag(e.target.value)}
                     className={`w-full px-2 py-2 rounded-xl text-xs font-medium border ${isDark ? "bg-slate-950 border-slate-800 text-indigo-300" : "bg-slate-50 border-slate-200 text-indigo-700"}`}
                   >
-                    {MASTER_TAG_LIBRARY.map(t => <option key={t} value={t}>{t}</option>)}
+                    {tags.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
 
@@ -973,7 +1045,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Collaborator Tagging */}
               {employees.length > 1 && (
                 <div className="flex items-center justify-between pt-1 text-xs">
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -1004,13 +1075,13 @@ export default function App() {
                     })}
                   </div>
                   <span className="text-[11px] text-slate-400 hidden md:inline">
-                    Check off sub-tasks to auto-calculate progress %
+                    Checking sub-tasks drives progress % automatically
                   </span>
                 </div>
               )}
             </form>
 
-            {/* Tasks Spreadsheet Table */}
+            {/* Task Table */}
             <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs sm:text-sm">
@@ -1019,7 +1090,7 @@ export default function App() {
                       <th className="py-3 px-3 w-10 text-center">Done</th>
                       <th className="py-3 px-3">Deliverable & Sub-Tasks (Click row to expand)</th>
                       <th className="py-3 px-3 w-28">Project</th>
-                      <th className="py-3 px-3 w-24">Activity Tag</th>
+                      <th className="py-3 px-3 w-28">Activity Tag</th>
                       <th className="py-3 px-3 w-28">Due Date</th>
                       <th className="py-3 px-3 w-36">Sub-Task Progress</th>
                       <th className="py-3 px-3 w-20 text-right">Logged</th>
@@ -1027,14 +1098,14 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-200/70"}`}>
-                    {activeRows.length === 0 ? (
+                    {activeTasks.length === 0 ? (
                       <tr>
                         <td colSpan="8" className="py-10 text-center text-slate-400 text-xs">
                           Your active sheet is clear! Add your tasks and sub-tasks above.
                         </td>
                       </tr>
                     ) : (
-                      activeRows.map(row => {
+                      activeTasks.map(row => {
                         const mins = Number(row.Auto_Learning_Hours || 0);
                         const subtasks = parseSubtasks(row);
                         const doneSubCount = subtasks.filter(s => s.done).length;
@@ -1070,7 +1141,6 @@ export default function App() {
                                     {isExpanded ? <ChevronDown className="h-4 w-4 text-indigo-500" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
                                   </button>
 
-                                  {/* Inline Edit Title */}
                                   {editingCell?.pulseId === row.Pulse_ID && editingCell?.field === "title" ? (
                                     <input
                                       autoFocus
@@ -1110,7 +1180,6 @@ export default function App() {
                                 </div>
                               </td>
 
-                              {/* Inline Edit Project */}
                               <td className="py-3 px-3">
                                 <select
                                   value={row.Project_ID}
@@ -1121,28 +1190,25 @@ export default function App() {
                                 </select>
                               </td>
 
-                              {/* Inline Edit Activity Tag */}
                               <td className="py-3 px-3">
                                 <select
                                   value={row.Task_Code || "#General"}
                                   onChange={(e) => handleUpdateRowAttribute(row.Pulse_ID, "Task_Code", e.target.value)}
                                   className={`px-1.5 py-0.5 rounded text-[11px] font-medium border ${isDark ? "bg-slate-900 border-slate-700 text-slate-300" : "bg-slate-100 border-slate-200 text-slate-700"}`}
                                 >
-                                  {MASTER_TAG_LIBRARY.map(t => <option key={t} value={t}>{t}</option>)}
+                                  {tags.map(t => <option key={t} value={t}>{t}</option>)}
                                 </select>
                               </td>
 
-                              {/* Inline Edit Due Date */}
                               <td className="py-3 px-3 text-xs font-mono">
                                 <input
                                   type="date"
                                   value={due || todayStr}
                                   onChange={(e) => handleUpdateRowAttribute(row.Pulse_ID, "Target_Deadline", e.target.value)}
-                                  className={`bg-transparent text-xs font-mono border-b border-transparent hover:border-slate-400 focus:outline-none`}
+                                  className="bg-transparent text-xs font-mono border-b border-transparent hover:border-slate-400 focus:outline-none"
                                 />
                               </td>
 
-                              {/* Auto-Calculated Progress Bar */}
                               <td className="py-3 px-3">
                                 <div className="flex items-center gap-2">
                                   <div className={`w-16 h-2 rounded-full overflow-hidden ${isDark ? "bg-slate-800" : "bg-slate-200"}`}>
@@ -1156,7 +1222,6 @@ export default function App() {
                                 {(mins / 60).toFixed(1)}h
                               </td>
 
-                              {/* 1-Tap Time Log Buttons */}
                               <td className="py-3 px-4 text-right">
                                 <div className="inline-flex items-center gap-1">
                                   <button
@@ -1184,7 +1249,6 @@ export default function App() {
                               </td>
                             </tr>
 
-                            {/* EXPANDED SUBTASK CHECKLIST ROW */}
                             {isExpanded && (
                               <tr className={isDark ? "bg-slate-950/70" : "bg-indigo-50/30"}>
                                 <td></td>
@@ -1196,7 +1260,7 @@ export default function App() {
 
                                     {subtasks.length === 0 ? (
                                       <p className="text-xs text-slate-400 italic">
-                                        No sub-tasks defined yet. Add the steps below to track concrete progress.
+                                        No sub-tasks defined yet. Add steps below to drive progress automatically.
                                       </p>
                                     ) : (
                                       <div className="space-y-1.5">
@@ -1262,8 +1326,7 @@ export default function App() {
                 </table>
               </div>
 
-              {/* Completed Tasks Drawer */}
-              {completedRows.length > 0 && (
+              {completedTasks.length > 0 && (
                 <div className={`border-t px-4 py-2.5 text-xs ${isDark ? "border-slate-800 bg-slate-950/50" : "border-slate-200 bg-slate-50"}`}>
                   <button
                     type="button"
@@ -1271,12 +1334,12 @@ export default function App() {
                     className="font-semibold text-slate-500 hover:text-indigo-500 flex items-center gap-1.5"
                   >
                     <CheckSquare className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>{showCompletedRows ? "Hide" : "Show"} Completed Tasks ({completedRows.length})</span>
+                    <span>{showCompletedRows ? "Hide" : "Show"} Completed Tasks ({completedTasks.length})</span>
                   </button>
 
                   {showCompletedRows && (
                     <div className="mt-2 space-y-1.5 pt-2 border-t border-slate-200/50">
-                      {completedRows.map(c => (
+                      {completedTasks.map(c => (
                         <div key={c.Pulse_ID} className="flex items-center justify-between py-1 text-slate-400">
                           <span className="line-through">{c.Monday_Commitment} ({getProjectLabel(c.Project_ID)}) • {c.Task_Code}</span>
                           <span className="font-mono text-emerald-500 font-semibold">
@@ -1292,95 +1355,155 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= TAB 2: LEARNING LOG (FREE-FORM & MATCHING DESIGN) ================= */}
+        {/* ================= TAB 2: LEARNING LOG (DEDICATED QUEUE WITH +30m/+1h BUTTONS) ================= */}
         {activeTab === "learning" && (
           <div className="space-y-4">
-            {/* Free-form learning input */}
-            <form onSubmit={handleLogLearning} className={`p-4 rounded-2xl border shadow-sm grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
-              <div className="sm:col-span-6">
-                <input
-                  type="text"
-                  required
-                  value={lrnTopic}
-                  onChange={(e) => setLrnTopic(e.target.value)}
-                  placeholder="What skill, tool, or concept did you study/practice?"
-                  className={`w-full px-3 py-2 rounded-xl text-xs sm:text-sm border focus:outline-none ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-900"}`}
-                />
+            {/* Add to Learning Bucket Form */}
+            <form onSubmit={handleCreateLearningItem} className={`p-3.5 rounded-2xl border shadow-sm space-y-2 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-indigo-500 flex items-center gap-1.5">
+                  <GraduationCap className="h-4 w-4" /> Add Topic to Learning Bucket (Plan now, log effort as you practice)
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  Earns +15 GP for every 30 mins logged!
+                </span>
               </div>
 
-              <div className="sm:col-span-3">
-                <input
-                  type="text"
-                  value={lrnTag}
-                  onChange={(e) => setLrnTag(e.target.value)}
-                  placeholder="#Electronics, #Pedagogy"
-                  className={`w-full px-3 py-2 rounded-xl text-xs border focus:outline-none font-medium ${isDark ? "bg-slate-950 border-slate-800 text-purple-300" : "bg-slate-50 border-slate-200 text-purple-700"}`}
-                />
-              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                <div className="sm:col-span-8">
+                  <input
+                    type="text"
+                    required
+                    value={newLearningTopic}
+                    onChange={(e) => setNewLearningTopic(e.target.value)}
+                    placeholder="Skill or topic (e.g. ESP32 Wi-Fi mesh telemetry, Laser cut kerf tolerances)"
+                    className={`w-full px-3 py-2 rounded-xl text-xs sm:text-sm border focus:outline-none ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-900 focus:bg-white"}`}
+                  />
+                </div>
 
-              <div className="sm:col-span-3 flex items-center gap-2">
-                <select
-                  value={lrnMinutes}
-                  onChange={(e) => setLrnMinutes(Number(e.target.value))}
-                  className={`w-full px-2.5 py-2 rounded-xl text-xs font-mono border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"}`}
-                >
-                  <option value={30}>30 mins (+15 GP)</option>
-                  <option value={45}>45 mins (+22 GP)</option>
-                  <option value={60}>1 hour (+30 GP)</option>
-                  <option value={90}>1.5 hours (+45 GP)</option>
-                  <option value={120}>2 hours (+60 GP)</option>
-                </select>
-                <button type="submit" className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold shrink-0 cursor-pointer">
-                  + Log
-                </button>
+                <div className="sm:col-span-3">
+                  <select
+                    value={newLearningTag}
+                    onChange={(e) => setNewLearningTag(e.target.value)}
+                    className={`w-full px-2.5 py-2 rounded-xl text-xs font-medium border ${isDark ? "bg-slate-950 border-slate-800 text-purple-300" : "bg-slate-50 border-slate-200 text-purple-700"}`}
+                  >
+                    {tags.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-1">
+                  <button
+                    type="submit"
+                    className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold shrink-0 cursor-pointer"
+                  >
+                    + Add
+                  </button>
+                </div>
               </div>
             </form>
 
-            {/* Learning Log Table */}
+            {/* Learning Queue Table with +30m and +1h buttons */}
             <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
               <table className="w-full text-left border-collapse text-xs sm:text-sm">
                 <thead>
                   <tr className={`border-b text-[11px] uppercase font-semibold ${isDark ? "bg-slate-950/60 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
-                    <th className="py-3 px-4">Date</th>
-                    <th className="py-3 px-4">What I Learned / Practiced</th>
-                    <th className="py-3 px-4">Skill Tag</th>
-                    <th className="py-3 px-4 text-right">Duration</th>
+                    <th className="py-3 px-4">Skill / Topic Bucket</th>
+                    <th className="py-3 px-3 w-32">Tag</th>
+                    <th className="py-3 px-3 w-28 text-right">Logged Time</th>
+                    <th className="py-3 px-4 w-44 text-right">Log Practice Time</th>
                   </tr>
                 </thead>
                 <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-200/60"}`}>
-                  {empDailyLogs.filter(l => Number(l.Learning_Hours || 0) > 0).length === 0 ? (
+                  {activeLearningItems.length === 0 ? (
                     <tr>
                       <td colSpan="4" className="py-8 text-center text-slate-400 text-xs">
-                        No learning logged yet. Enter your practice session above!
+                        Your learning bucket is empty. Add a skill above and tap +30m / +1h whenever you study!
                       </td>
                     </tr>
                   ) : (
-                    empDailyLogs.filter(l => Number(l.Learning_Hours || 0) > 0).slice().reverse().map(l => (
-                      <tr key={l.Log_ID}>
-                        <td className="py-3 px-4 font-mono text-xs text-slate-400">{normalizeDateStr(l.Date)}</td>
-                        <td className="py-3 px-4 font-medium">{l.Learning_Module_Code}</td>
-                        <td className="py-3 px-4">
-                          <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-500 font-semibold text-xs">
-                            {l.Task_Code || "#Learning"}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-purple-400">{l.Learning_Hours} mins</td>
-                      </tr>
-                    ))
+                    activeLearningItems.map(item => {
+                      const mins = Number(item.Auto_Learning_Hours || 0);
+                      return (
+                        <tr key={item.Pulse_ID} className={`transition ${isDark ? "hover:bg-slate-800/40" : "hover:bg-slate-50/80"}`}>
+                          <td className="py-3 px-4 font-medium">
+                            {item.Monday_Commitment}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-purple-500/10 text-purple-500">
+                              {item.Task_Code || "#Learning"}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-right font-mono font-bold text-purple-400">
+                            {(mins / 60).toFixed(1)}h ({mins}m)
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="inline-flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleQuickLogTimeOnRow(item, 30, false)}
+                                className={`px-2 py-1 rounded text-[11px] font-mono font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}
+                              >
+                                +30m
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleQuickLogTimeOnRow(item, 60, false)}
+                                className={`px-2 py-1 rounded text-[11px] font-mono font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}
+                              >
+                                +1h
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleQuickLogTimeOnRow(item, 0, true)}
+                                className="px-2 py-1 rounded text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition"
+                              >
+                                Done ✓
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
+
+              {completedLearningItems.length > 0 && (
+                <div className={`border-t px-4 py-2.5 text-xs ${isDark ? "border-slate-800 bg-slate-950/50" : "border-slate-200 bg-slate-50"}`}>
+                  <button
+                    type="button"
+                    onClick={() => setShowCompletedLearning(!showCompletedLearning)}
+                    className="font-semibold text-slate-500 hover:text-indigo-500 flex items-center gap-1.5"
+                  >
+                    <CheckSquare className="h-3.5 w-3.5 text-emerald-500" />
+                    <span>{showCompletedLearning ? "Hide" : "Show"} Completed Skills ({completedLearningItems.length})</span>
+                  </button>
+
+                  {showCompletedLearning && (
+                    <div className="mt-2 space-y-1.5 pt-2 border-t border-slate-200/50">
+                      {completedLearningItems.map(c => (
+                        <div key={c.Pulse_ID} className="flex items-center justify-between py-1 text-slate-400">
+                          <span className="line-through">{c.Monday_Commitment} ({c.Task_Code})</span>
+                          <span className="font-mono text-emerald-500 font-semibold">
+                            ✓ Mastered ({(Number(c.Auto_Learning_Hours || 0) / 60).toFixed(1)}h)
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* ================= TAB 3: MONTHLY & GOAL REVIEW (PERSONAL SELF-REFLECTION) ================= */}
+        {/* ================= TAB 3: MONTHLY & GOAL REVIEW ================= */}
         {activeTab === "monthly_review" && (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold">Personal Monthly & Goal Review</h2>
-                <p className="text-xs text-slate-400">Strictly personal to {currentEmp.Name} — reflecting on effort, tags & baseline KRAs</p>
+                <p className="text-xs text-slate-400">Reflecting on effort, tags & baseline KRAs for {currentEmp.Name}</p>
               </div>
               <div className={`flex p-1 rounded-xl border text-xs ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
                 <button
@@ -1410,13 +1533,13 @@ export default function App() {
               <div className={`p-4 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
                 <span className="text-xs text-slate-400 block">Total Logged Hours</span>
                 <span className="text-2xl font-bold font-mono text-indigo-500">{reviewMetrics.totalHours}h</span>
-                <span className="text-[11px] text-slate-400 block mt-0.5">{reviewMetrics.projectHours}h Projects</span>
+                <span className="text-[11px] text-slate-400 block mt-0.5">{reviewMetrics.projectHours}h Work Effort</span>
               </div>
 
               <div className={`p-4 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
-                <span className="text-xs text-slate-400 block">Upskilling Logged</span>
+                <span className="text-xs text-slate-400 block">Upskilling Invested</span>
                 <span className="text-2xl font-bold font-mono text-purple-500">{reviewMetrics.learningHours}h</span>
-                <span className="text-[11px] text-slate-400 block mt-0.5">Deliberate Practice</span>
+                <span className="text-[11px] text-slate-400 block mt-0.5">Deliberate Learning</span>
               </div>
 
               <div className={`p-4 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
@@ -1426,7 +1549,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Time Spent by Activity Tag Breakdown (Answers user's meeting/field question!) */}
+            {/* Time by Tag Breakdown */}
             <div className={`p-5 rounded-2xl border space-y-3 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
               <h3 className="font-bold text-sm">Where My Time Went by Activity Tag ({reviewPeriod === "WEEK" ? "This Week" : "This Month"})</h3>
               {reviewMetrics.tagBars.length === 0 ? (
@@ -1448,7 +1571,7 @@ export default function App() {
               )}
             </div>
 
-            {/* Personal KRAs */}
+            {/* Monthly KRAs */}
             <div className={`p-5 rounded-2xl border space-y-3 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
               <div className="flex justify-between items-center">
                 <h3 className="font-bold text-sm flex items-center gap-1.5">
@@ -1487,10 +1610,10 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= TAB 4: COMPANY MASTER VIEW (LAUNCH TOWER + DYNAMIC CARDS) ================= */}
+        {/* ================= TAB 4: COMPANY MASTER VIEW ================= */}
         {activeTab === "company_master" && (
           <div className="space-y-5">
-            {/* 1. WEEKLY TEAM LAUNCH TOWER WIDGET (Week-by-Week Comparison) */}
+            {/* WEEKLY LAUNCH TOWER WIDGET */}
             <div className={`p-5 rounded-2xl border shadow-sm space-y-4 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3 border-slate-200/50">
                 <div>
@@ -1503,7 +1626,7 @@ export default function App() {
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5">
                     Height this week: <strong className="text-indigo-500 font-mono">{towerData.currentWkPoints} GP</strong>
-                    {" "}({towerData.delta >= 0 ? `▲ +${towerData.delta} GP higher than last week` : `▼ ${towerData.delta} GP vs last week`})
+                    {" "}({towerData.delta >= 0 ? `▲ +${towerData.delta} GP vs last week` : `▼ ${towerData.delta} GP vs last week`})
                   </p>
                 </div>
                 <div className="text-left sm:text-right text-xs">
@@ -1512,7 +1635,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Weekly Tower Comparison Bar Chart */}
+              {/* Weekly Comparison Chart */}
               <div className="grid grid-cols-4 gap-3 items-end pt-2 h-36">
                 {towerData.historyBars.map(bar => (
                   <div key={bar.weekMon} className="flex flex-col items-center gap-1.5 h-full justify-end">
@@ -1526,7 +1649,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* 2. DYNAMIC CONTEXT-AWARE KPI CARDS */}
+            {/* DYNAMIC CONTEXT-AWARE KPI CARDS */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               <div className={`p-3.5 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
                 <span className="text-[11px] text-slate-400 block">
@@ -1545,7 +1668,7 @@ export default function App() {
               <div className={`p-3.5 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
                 <span className="text-[11px] text-slate-400 block">In Progress</span>
                 <span className="text-xl font-bold font-mono text-blue-500">{masterKpiStats.inProgress}</span>
-                <span className="text-[11px] text-slate-400 block">Active execution</span>
+                <span className="text-[11px] text-slate-400 block">Active roadmap</span>
               </div>
 
               <div className={`p-3.5 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
@@ -1561,7 +1684,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* 3. FILTER BAR */}
+            {/* Filters */}
             <div className={`p-3 rounded-2xl border flex flex-wrap items-center justify-between gap-2 text-xs ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
               <div className="flex items-center gap-2 flex-wrap">
                 <Filter className="h-3.5 w-3.5 text-indigo-500" />
@@ -1607,11 +1730,11 @@ export default function App() {
               </div>
 
               <span className="text-slate-400">
-                Click any row to view sub-task progress
+                Click any row to inspect sub-tasks
               </span>
             </div>
 
-            {/* 4. MASTER ROADMAP TABLE */}
+            {/* Master Roadmap Table */}
             <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs sm:text-sm">
@@ -1745,7 +1868,128 @@ export default function App() {
         )}
       </main>
 
-      {/* ================= GUARDED COMPLETION MODAL (CANNOT COMPLETE WITH 0h) ================= */}
+      {/* ================= TAGS & PROJECTS MANAGER DRAWER ================= */}
+      {showLibraryManager && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`border rounded-2xl max-w-lg w-full p-5 shadow-2xl space-y-5 text-xs max-h-[85vh] overflow-y-auto ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
+            <div className="flex justify-between items-center border-b pb-2.5 border-slate-200/50">
+              <div className="flex items-center gap-2">
+                <Settings className="h-4 w-4 text-indigo-500" />
+                <h3 className="font-bold text-sm">Manage Tags & Projects Library</h3>
+              </div>
+              <button type="button" onClick={() => setShowLibraryManager(false)}><X className="h-4 w-4 text-slate-400" /></button>
+            </div>
+
+            {/* 1. TAGS SECTION */}
+            <div className="space-y-2.5">
+              <h4 className="font-bold text-xs uppercase text-indigo-500 flex items-center gap-1.5">
+                <Tag className="h-3.5 w-3.5" /> Activity Tags Library ({tags.length})
+              </h4>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newTagInput}
+                  onChange={(e) => setNewTagInput(e.target.value)}
+                  placeholder="e.g. #VendorAudit or #FieldMela"
+                  className={`flex-1 px-3 py-1.5 rounded-xl border text-xs ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddNewTag}
+                  className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl text-xs"
+                >
+                  + Add Tag
+                </button>
+              </div>
+
+              {/* Tag Pills with Delete Option */}
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {tags.map(t => (
+                  <span
+                    key={t}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${isDark ? "bg-slate-800 border-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 text-slate-700"}`}
+                  >
+                    <span>{t}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTag(t)}
+                      className="text-slate-400 hover:text-rose-500 p-0.5 ml-0.5"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <hr className={isDark ? "border-slate-800" : "border-slate-200"} />
+
+            {/* 2. PROJECTS SECTION */}
+            <div className="space-y-2.5">
+              <h4 className="font-bold text-xs uppercase text-indigo-500 flex items-center gap-1.5">
+                <FolderPlus className="h-3.5 w-3.5" /> Operational Projects ({projects.length})
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                <input
+                  type="text"
+                  value={newPrjCode}
+                  onChange={(e) => setNewPrjCode(e.target.value)}
+                  placeholder="Code (e.g. PRJ-ROBO)"
+                  className={`sm:col-span-4 px-3 py-1.5 rounded-xl border text-xs uppercase ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`}
+                />
+                <input
+                  type="text"
+                  value={newPrjName}
+                  onChange={(e) => setNewPrjName(e.target.value)}
+                  placeholder="Name (e.g. Robotics Championship)"
+                  className={`sm:col-span-6 px-3 py-1.5 rounded-xl border text-xs ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddNewProject}
+                  className="sm:col-span-2 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl text-xs"
+                >
+                  + Add
+                </button>
+              </div>
+
+              {/* Projects List with Delete Option */}
+              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                {projects.map(p => (
+                  <div
+                    key={p.Project_ID}
+                    className={`p-2 rounded-xl border flex items-center justify-between text-xs ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200"}`}
+                  >
+                    <div>
+                      <span className="font-mono font-bold text-indigo-400 mr-2">[{p.Project_ID}]</span>
+                      <span className="font-medium">{p.Project_Name}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteProject(p.Project_ID)}
+                      className="text-slate-400 hover:text-rose-500 p-1"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-200/50">
+              <button
+                type="button"
+                onClick={() => setShowLibraryManager(false)}
+                className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl text-xs"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= GUARDED COMPLETION MODAL ================= */}
       {completionGuardTarget && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className={`border rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4 ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
@@ -1843,7 +2087,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ================= STREAK 14-DAY CALENDAR MODAL ================= */}
+      {/* ================= STREAK MODAL ================= */}
       {showStreakModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className={`border rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4 text-xs ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
@@ -1856,10 +2100,9 @@ export default function App() {
             </div>
 
             <p className="text-xs text-slate-400">
-              Unique working days (Mon–Sat) with logged task effort or learning:
+              Unique working days with logged task effort or learning:
             </p>
 
-            {/* 14-Day Heatmap grid */}
             <div className="grid grid-cols-7 gap-2 pt-1 text-center font-mono">
               {Array.from({ length: 14 }).map((_, i) => {
                 const targetD = new Date();
@@ -1923,38 +2166,6 @@ export default function App() {
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={() => setShowEmpModal(false)} className="px-3 py-2 text-slate-400">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl">Save Member</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ================= ADD PROJECT MODAL ================= */}
-      {showPrjModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className={`border rounded-2xl max-w-md w-full p-5 shadow-xl space-y-3 text-xs ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
-            <div className="flex justify-between items-center">
-              <h3 className="text-sm font-bold">Add Project Pillar</h3>
-              <button type="button" onClick={() => setShowPrjModal(false)}><X className="h-4 w-4" /></button>
-            </div>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const entry = { Project_ID: newPrj.projectId.toUpperCase().trim(), Project_Name: newPrj.projectName, Priority_Level: newPrj.priority, Status: "Active" };
-              setProjects(prev => [...prev, entry]);
-              setShowPrjModal(false);
-              showToast(`Added project ${entry.Project_Name}!`);
-              try {
-                fetch(APPS_SCRIPT_URL, {
-                  method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-                  body: JSON.stringify({ action: "createProject", ...newPrj })
-                });
-              } catch (err) {}
-            }} className="space-y-3">
-              <input required type="text" value={newPrj.projectId} onChange={e => setNewPrj({...newPrj, projectId: e.target.value})} className={`w-full rounded-xl p-2.5 uppercase border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} placeholder="Code (e.g. PRJ-ROBO)" />
-              <input required type="text" value={newPrj.projectName} onChange={e => setNewPrj({...newPrj, projectName: e.target.value})} className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} placeholder="Project Name (e.g. Robotics Series)" />
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setShowPrjModal(false)} className="px-3 py-2 text-slate-400">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl">Save Project</button>
               </div>
             </form>
           </div>
