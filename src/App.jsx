@@ -6,7 +6,7 @@ import {
   Edit3, Rocket, Check, X, Sun, Moon, Table, 
   CheckSquare, Square, ChevronRight, ChevronDown, 
   AlertCircle, ListChecks, Filter, Tag, Calendar, 
-  Award, TrendingUp, Settings, Sliders, MapPin, Briefcase
+  Award, TrendingUp, Settings, Sliders, MapPin, Eye
 } from 'lucide-react';
 
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnW8cS7n3pusA4sHYN1NJOPHqKR38G4_qAa0VxnU-mKrFDsGjczS0TV5YFZoJaTtK-/exec";
@@ -85,7 +85,6 @@ function parseSubtasks(row) {
   return [];
 }
 
-// Resilient LocalStorage Loader (Guards against corrupted null objects)
 function safeLoadJson(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
@@ -123,7 +122,6 @@ function calculateUniqueDayStreak(userLogs) {
   return streak;
 }
 
-// Days of Current Week
 function getWeekDates(mondayStr) {
   const mon = new Date(mondayStr);
   const days = [];
@@ -139,17 +137,17 @@ function getWeekDates(mondayStr) {
   return days;
 }
 
-// ================= AUTO-COMPLETE COMBOBOX WITH ON-THE-FLY CREATION =================
+// Searchable Auto-complete Combobox
 function SearchableTagCombobox({ value, onChange, availableTags, onAddNewTag, isDark, placeholder = "Tag..." }) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
 
   const cleanQuery = query.trim().startsWith("#") ? query.trim() : `#${query.trim().replace(/\s+/g, "")}`;
-  const filtered = availableTags.filter(t => 
-    t.toLowerCase().includes(query.toLowerCase().replace(/^#/, ""))
+  const filtered = (availableTags || []).filter(t => 
+    t && t.toLowerCase().includes(query.toLowerCase().replace(/^#/, ""))
   );
-  const isExactMatch = availableTags.some(t => t.toLowerCase() === cleanQuery.toLowerCase());
+  const isExactMatch = (availableTags || []).some(t => t && t.toLowerCase() === cleanQuery.toLowerCase());
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -244,12 +242,12 @@ function SearchableTagCombobox({ value, onChange, availableTags, onAddNewTag, is
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("ie_theme") || "light");
-  const [activeTab, setActiveTab] = useState("my_tasks"); // 'my_tasks' | 'learning' | 'monthly_review' | 'company_master'
+  const [activeTab, setActiveTab] = useState("my_tasks");
   const [activeEmployeeEmail, setActiveEmployeeEmail] = useState(() => localStorage.getItem("ie_v3_active_emp") || "");
 
   useEffect(() => { localStorage.setItem("ie_theme", theme); }, [theme]);
 
-  // Safe State Loading (Protects against blank screens)
+  // Safe State Loading
   const [employees, setEmployees] = useState(() => safeLoadJson("ie_v3_employees", []));
   const [projects, setProjects] = useState(() => mergeById(safeLoadJson("ie_v3_projects", []), DEFAULT_PROJECTS, "Project_ID"));
   const [tags, setTags] = useState(() => safeLoadJson("ie_v8_tags", DEFAULT_TAGS));
@@ -260,8 +258,7 @@ export default function App() {
   const currentMondayStr = getCurrentMondayStr();
   const weekDays = useMemo(() => getWeekDates(currentMondayStr), [currentMondayStr]);
 
-  // Task Creation Mode: Deliverable (Standard) vs. Field Event (School Visit)
-  const [taskCreationMode, setTaskCreationMode] = useState("DELIVERABLE"); // 'DELIVERABLE' | 'EVENT'
+  // Task Creation Form
   const [quickTitle, setQuickTitle] = useState("");
   const [quickProject, setQuickProject] = useState("PRJ-MAKER");
   const [quickTag, setQuickTag] = useState("#SchoolVisit");
@@ -280,7 +277,7 @@ export default function App() {
   const [showCompletedRows, setShowCompletedRows] = useState(false);
   const [showCompletedLearning, setShowCompletedLearning] = useState(false);
 
-  // Guarded Completion (No 0-Hour completions)
+  // Guarded Completion
   const [completionGuardTarget, setCompletionGuardTarget] = useState(null);
   const [guardDurationInput, setGuardDurationInput] = useState(60);
 
@@ -290,7 +287,7 @@ export default function App() {
   const [showLibraryManager, setShowLibraryManager] = useState(false);
   const [showEmpModal, setShowEmpModal] = useState(false);
 
-  // Employee Form State (Protected with clean defaults)
+  // Employee Form
   const [newEmp, setNewEmp] = useState({ name: "", email: "", roleTitle: "STEM Facilitator", department: "Training & Delivery", level: "L3 Advanced", rnrSummary: "" });
   const [newTagInput, setNewTagInput] = useState("");
   const [newPrjCode, setNewPrjCode] = useState("");
@@ -302,10 +299,10 @@ export default function App() {
   const [rnrDraft, setRnrDraft] = useState("");
 
   // Company Master View Modes
-  const [companyMasterMode, setCompanyMasterMode] = useState("ROADMAP"); // 'ROADMAP' | 'TIMESHEET'
+  const [companyMasterMode, setCompanyMasterMode] = useState("TIMESHEET"); // 'TIMESHEET' | 'ROADMAP' | 'DAILY_LOGS'
   const [companyFilterProject, setCompanyFilterProject] = useState("ALL");
   const [companyFilterMember, setCompanyFilterMember] = useState("ALL");
-  const [companyFilterStatus, setCompanyFilterStatus] = useState("ALL");
+  const [companyFilterTag, setCompanyFilterTag] = useState("ALL");
   const [expandedMasterKeys, setExpandedMasterKeys] = useState({});
 
   const [isLoading, setIsLoading] = useState(false);
@@ -316,7 +313,6 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Safe Persistence
   useEffect(() => { localStorage.setItem("ie_v3_employees", JSON.stringify(employees)); }, [employees]);
   useEffect(() => { localStorage.setItem("ie_v3_projects", JSON.stringify(projects)); }, [projects]);
   useEffect(() => { localStorage.setItem("ie_v8_tags", JSON.stringify(tags)); }, [tags]);
@@ -334,24 +330,24 @@ export default function App() {
     try {
       const res = await fetch(`${APPS_SCRIPT_URL}?action=getBootstrapData`);
       const data = await res.json();
-      if (data.status === "success") {
-        if (data.employees?.length > 0) {
+      if (data && data.status === "success") {
+        if (data.employees && data.employees.length > 0) {
           const cleanEmps = data.employees.filter(e => e && e.Email);
           setEmployees(prev => mergeById(cleanEmps, prev, "Email"));
           if (!activeEmployeeEmail && cleanEmps[0]) setActiveEmployeeEmail(cleanEmps[0].Email);
         }
-        if (data.projects?.length > 0) {
+        if (data.projects && data.projects.length > 0) {
           setProjects(prev => mergeById(data.projects, prev, "Project_ID"));
         }
-        if (data.tasks?.length > 0) {
+        if (data.tasks && data.tasks.length > 0) {
           const remoteTags = data.tasks.map(t => t.Task_Code).filter(t => t && t.startsWith("#"));
           if (remoteTags.length > 0) setTags(prev => Array.from(new Set([...prev, ...remoteTags])));
         }
         if (data.weeklyPulses) {
           setWeeklyPulses(prev => {
             const remoteMap = new Map();
-            data.weeklyPulses.forEach(p => remoteMap.set(p.Pulse_ID, p));
-            prev.forEach(localP => { if (!remoteMap.has(localP.Pulse_ID)) remoteMap.set(localP.Pulse_ID, localP); });
+            data.weeklyPulses.forEach(p => { if (p && p.Pulse_ID) remoteMap.set(p.Pulse_ID, p); });
+            prev.forEach(localP => { if (localP && localP.Pulse_ID && !remoteMap.has(localP.Pulse_ID)) remoteMap.set(localP.Pulse_ID, localP); });
             return Array.from(remoteMap.values());
           });
         }
@@ -360,7 +356,7 @@ export default function App() {
         }
       }
     } catch (err) {
-      console.log("Using local state:", err);
+      console.log("Using cached state:", err);
     } finally {
       setIsLoading(false);
     }
@@ -368,7 +364,6 @@ export default function App() {
 
   useEffect(() => { fetchSheetData(); }, []);
 
-  // Safe Current Employee Object
   const currentEmp = useMemo(() => {
     const found = employees.find(e => e && e.Email && (e.Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase());
     return found || {
@@ -384,14 +379,13 @@ export default function App() {
   useEffect(() => { setRnrDraft(currentEmp["R&R_Summary"] || ""); }, [currentEmp]);
 
   const empDailyLogs = useMemo(() => {
-    return dailyLogs.filter(l => l && (l.Emp_Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase());
+    return (dailyLogs || []).filter(l => l && (l.Emp_Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase());
   }, [dailyLogs, activeEmployeeEmail]);
 
   const currentStreak = useMemo(() => calculateUniqueDayStreak(empDailyLogs), [empDailyLogs]);
 
-  // Tasks Filter
   const empAllPulses = useMemo(() => {
-    return weeklyPulses.filter(p => p && (p.Emp_Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase());
+    return (weeklyPulses || []).filter(p => p && (p.Emp_Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase());
   }, [weeklyPulses, activeEmployeeEmail]);
 
   const activeTasks = useMemo(() => empAllPulses.filter(p => p.Project_ID !== "UPSKILLING" && Number(p.Auto_Task_Hours || 0) < 100), [empAllPulses]);
@@ -469,7 +463,7 @@ export default function App() {
     const weeklyPointsMap = {};
 
     weeklyPulses.forEach(row => {
-      if (Number(row.Auto_Task_Hours || 0) >= 100) {
+      if (row && Number(row.Auto_Task_Hours || 0) >= 100) {
         const cDate = normalizeDateStr(row.Completed_Date) || todayStr;
         const wkMon = getMondayOfDate(cDate);
         weeklyPointsMap[wkMon] = (weeklyPointsMap[wkMon] || 0) + 50;
@@ -481,15 +475,17 @@ export default function App() {
     });
 
     dailyLogs.forEach(l => {
-      const lDate = normalizeDateStr(l.Date) || todayStr;
-      const wkMon = getMondayOfDate(lDate);
-      const rt = Number(l.Task_Hours || 0);
-      const tMins = rt > 24 ? rt : Math.round(rt * 60);
-      if (tMins > 0) weeklyPointsMap[wkMon] = (weeklyPointsMap[wkMon] || 0) + Math.round((tMins / 15) * 5);
+      if (l) {
+        const lDate = normalizeDateStr(l.Date) || todayStr;
+        const wkMon = getMondayOfDate(lDate);
+        const rt = Number(l.Task_Hours || 0);
+        const tMins = rt > 24 ? rt : Math.round(rt * 60);
+        if (tMins > 0) weeklyPointsMap[wkMon] = (weeklyPointsMap[wkMon] || 0) + Math.round((tMins / 15) * 5);
 
-      const rl = Number(l.Learning_Hours || 0);
-      const lMins = rl > 24 ? rl : Math.round(rl * 60);
-      if (lMins > 0) weeklyPointsMap[wkMon] = (weeklyPointsMap[wkMon] || 0) + Math.round((lMins / 30) * 15);
+        const rl = Number(l.Learning_Hours || 0);
+        const lMins = rl > 24 ? rl : Math.round(rl * 60);
+        if (lMins > 0) weeklyPointsMap[wkMon] = (weeklyPointsMap[wkMon] || 0) + Math.round((lMins / 30) * 15);
+      }
     });
 
     const currentWkPoints = weeklyPointsMap[currentMondayStr] || 0;
@@ -510,8 +506,6 @@ export default function App() {
     else if (currentWkPoints >= 1000) currentTier = "Tier 2 (Level 3)";
     else if (currentWkPoints >= 500) currentTier = "Tier 1 (Level 2)";
 
-    const heightPercent = Math.min(100, Math.round((currentWkPoints / 2500) * 100));
-
     const historyBars = sortedWeeks.slice(-4).map(wk => ({
       weekMon: wk,
       points: weeklyPointsMap[wk],
@@ -521,36 +515,32 @@ export default function App() {
 
     return {
       currentWkPoints,
-      lastWkPoints,
       delta,
       currentTier,
-      heightPercent,
       recordHeight,
       rollingAvg,
       historyBars
     };
   }, [weeklyPulses, dailyLogs, currentMondayStr, todayStr]);
 
-  // Company Master Roadmap Aggregation
+  // Company Master Tasks Aggregation
   const companyMasterTasks = useMemo(() => {
     const groupedMap = new Map();
 
-    weeklyPulses.filter(p => p && p.Project_ID !== "UPSKILLING").forEach(p => {
+    (weeklyPulses || []).filter(p => p && p.Project_ID !== "UPSKILLING").forEach(p => {
       const key = `${(p.Project_ID || "").toUpperCase()}::${(p.Monday_Commitment || "").trim().toLowerCase()}`;
       const existing = groupedMap.get(key);
       const mins = Number(p.Auto_Learning_Hours || 0);
       const prog = Number(p.Auto_Task_Hours || 0);
       const subtasks = parseSubtasks(p);
-      const taskType = p.Friday_Outcome === "EVENT" ? "EVENT" : "DELIVERABLE";
 
       if (!existing) {
         groupedMap.set(key, {
           groupKey: key,
           pulseId: p.Pulse_ID,
-          title: p.Monday_Commitment,
-          projectId: p.Project_ID,
+          title: p.Monday_Commitment || "Untitled",
+          projectId: p.Project_ID || "PRJ-MAKER",
           tag: p.Task_Code || "#General",
-          taskType: taskType,
           createdDate: normalizeDateStr(p.Created_Date || p.Week_Start_Date) || todayStr,
           targetDeadline: normalizeDateStr(p.Target_Deadline),
           completedDate: normalizeDateStr(p.Completed_Date),
@@ -574,55 +564,27 @@ export default function App() {
     return companyMasterTasks.filter(t => {
       if (companyFilterProject !== "ALL" && t.projectId !== companyFilterProject) return false;
       if (companyFilterMember !== "ALL" && !t.owners.some(o => o.toLowerCase() === companyFilterMember.toLowerCase())) return false;
-      const isDone = t.progress >= 100;
-      const isOverdue = !isDone && t.targetDeadline && t.targetDeadline < todayStr;
-      if (companyFilterStatus === "ACTIVE" && isDone) return false;
-      if (companyFilterStatus === "DONE" && !isDone) return false;
-      if (companyFilterStatus === "OVERDUE" && !isOverdue) return false;
+      if (companyFilterTag !== "ALL" && t.tag !== companyFilterTag) return false;
       return true;
     });
-  }, [companyMasterTasks, companyFilterProject, companyFilterMember, companyFilterStatus, todayStr]);
+  }, [companyMasterTasks, companyFilterProject, companyFilterMember, companyFilterTag]);
 
-  const masterKpiStats = useMemo(() => {
-    const list = companyFilterMember === "ALL" 
-      ? companyMasterTasks 
-      : companyMasterTasks.filter(t => t.owners.some(o => o.toLowerCase() === companyFilterMember.toLowerCase()));
-
-    const total = list.length;
-    const completed = list.filter(t => t.progress >= 100).length;
-    const inProgress = list.filter(t => t.progress < 100).length;
-    const overdue = list.filter(t => t.progress < 100 && t.targetDeadline && t.targetDeadline < todayStr).length;
-    const totalProg = list.reduce((acc, t) => acc + t.progress, 0);
-    const avgProgress = total > 0 ? Math.round(totalProg / total) : 0;
-    const totalMins = list.reduce((acc, t) => acc + t.totalMinutes, 0);
-
-    return {
-      total,
-      completed,
-      inProgress,
-      overdue,
-      avgProgress,
-      totalHours: (totalMins / 60).toFixed(1),
-      filteredMemberName: companyFilterMember === "ALL" ? null : getEmployeeName(companyFilterMember)
-    };
-  }, [companyMasterTasks, companyFilterMember, todayStr, employees]);
-
-  // ================= DATE-WISE WEEKLY TIMESHEET MATRIX COMPUTATION =================
-  // Matrix for Personal Review & Company View
+  // Date-Wise Weekly Timesheet Matrix
   const computeTimesheetMatrix = (logsSubset, tasksSubset) => {
     const matrixRows = [];
 
-    tasksSubset.forEach(task => {
-      const taskTitle = task.Monday_Commitment || task.title;
-      const taskPrj = task.Project_ID || task.projectId;
+    (tasksSubset || []).forEach(task => {
+      if (!task) return;
+      const taskTitle = task.Monday_Commitment || task.title || "";
+      const taskPrj = task.Project_ID || task.projectId || "PRJ-MAKER";
       const taskTag = task.Task_Code || task.tag || "#General";
-      const isEvent = task.Friday_Outcome === "EVENT" || task.taskType === "EVENT";
 
       const dayMins = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0 };
       let rowTotalMins = 0;
 
       weekDays.forEach(day => {
         const matches = logsSubset.filter(l => {
+          if (!l) return false;
           const lDate = normalizeDateStr(l.Date);
           const isDateMatch = lDate === day.dateStr;
           const isTaskMatch = (l.Notes || "").trim().toLowerCase() === taskTitle.trim().toLowerCase() ||
@@ -644,7 +606,6 @@ export default function App() {
           title: taskTitle,
           project: taskPrj,
           tag: taskTag,
-          isEvent: isEvent,
           dayMins,
           totalHours: (rowTotalMins / 60).toFixed(1),
           totalMins: rowTotalMins
@@ -655,20 +616,89 @@ export default function App() {
     return matrixRows;
   };
 
+  // Safe Personal Matrix (Guarded to prevent white screen)
   const personalTimesheetMatrix = useMemo(() => {
-    const currentWeekLogs = empDailyLogs.filter(l => normalizeDateStr(l.Date) >= currentMondayStr);
-    return computeTimesheetMatrix(currentWeekLogs, empAllPulses);
+    try {
+      const currentWeekLogs = empDailyLogs.filter(l => normalizeDateStr(l.Date) >= currentMondayStr);
+      return computeTimesheetMatrix(currentWeekLogs, empAllPulses);
+    } catch (e) {
+      console.warn("Timesheet computation error:", e);
+      return [];
+    }
   }, [empDailyLogs, currentMondayStr, empAllPulses, weekDays]);
 
   const companyTimesheetMatrix = useMemo(() => {
-    const subsetLogs = dailyLogs.filter(l => {
-      if (normalizeDateStr(l.Date) < currentMondayStr) return false;
+    try {
+      const subsetLogs = (dailyLogs || []).filter(l => {
+        if (!l || normalizeDateStr(l.Date) < currentMondayStr) return false;
+        if (companyFilterMember !== "ALL" && (l.Emp_Email || "").toLowerCase() !== companyFilterMember.toLowerCase()) return false;
+        if (companyFilterTag !== "ALL" && l.Task_Code !== companyFilterTag) return false;
+        return true;
+      });
+
+      return computeTimesheetMatrix(subsetLogs, companyMasterTasks);
+    } catch (e) {
+      return [];
+    }
+  }, [dailyLogs, currentMondayStr, companyFilterMember, companyFilterTag, companyMasterTasks, weekDays]);
+
+  // Live Date-by-Date Log Ledger (Requested: Who worked on What Date and What Task)
+  const allEmployeesDailyLogFeed = useMemo(() => {
+    return (dailyLogs || []).filter(l => {
+      if (!l) return false;
       if (companyFilterMember !== "ALL" && (l.Emp_Email || "").toLowerCase() !== companyFilterMember.toLowerCase()) return false;
+      if (companyFilterTag !== "ALL" && l.Task_Code !== companyFilterTag) return false;
       return true;
+    }).slice().reverse();
+  }, [dailyLogs, companyFilterMember, companyFilterTag]);
+
+  // Safe Monthly Review Metrics
+  const reviewMetrics = useMemo(() => {
+    const currentMonthPrefix = todayStr.slice(0, 7);
+    const periodLogs = empDailyLogs.filter(l => {
+      const d = normalizeDateStr(l.Date);
+      return reviewPeriod === "WEEK" ? d >= currentMondayStr : d.startsWith(currentMonthPrefix);
     });
 
-    return computeTimesheetMatrix(subsetLogs, companyMasterTasks);
-  }, [dailyLogs, currentMondayStr, companyFilterMember, companyMasterTasks, weekDays]);
+    let projectMins = 0;
+    let learningMins = 0;
+    const byTag = {};
+
+    periodLogs.forEach(l => {
+      const rt = Number(l.Task_Hours || 0);
+      const tMins = rt > 24 ? rt : Math.round(rt * 60);
+      const rl = Number(l.Learning_Hours || 0);
+      const lMins = rl > 24 ? rl : Math.round(rl * 60);
+
+      projectMins += tMins;
+      learningMins += lMins;
+
+      const tagKey = l.Task_Code || "#General";
+      if (tMins > 0) byTag[tagKey] = (byTag[tagKey] || 0) + tMins;
+      if (lMins > 0) byTag["#Learning"] = (byTag["#Learning"] || 0) + lMins;
+    });
+
+    const totalMins = projectMins + learningMins;
+    const tagBars = Object.entries(byTag).map(([tag, mins]) => ({
+      tag,
+      hours: (mins / 60).toFixed(1),
+      percent: totalMins > 0 ? Math.round((mins / totalMins) * 100) : 0
+    })).sort((a, b) => Number(b.hours) - Number(a.hours));
+
+    const totalGoals = empAllPulses.filter(p => p.Project_ID !== "UPSKILLING").length;
+    const completedGoals = completedTasks.length;
+    const goalCompletionRate = totalGoals > 0 ? Math.round((completedGoals / totalGoals) * 100) : 0;
+
+    return {
+      totalHours: (totalMins / 60).toFixed(1),
+      projectHours: (projectMins / 60).toFixed(1),
+      learningHours: (learningMins / 60).toFixed(1),
+      totalGoals,
+      completedGoals,
+      goalCompletionRate,
+      tagBars
+    };
+  }, [empDailyLogs, reviewPeriod, currentMondayStr, todayStr, empAllPulses, completedTasks]);
 
   // Subtask Sync
   const syncSubtasksAndProgress = (rowItem, updatedSubtasks) => {
@@ -736,7 +766,7 @@ export default function App() {
     syncSubtasksAndProgress(rowItem, updated);
   };
 
-  // 1-Tap Time Logging with Date-Wise Stamping
+  // 1-Tap Time Logging with Explicit Date Record
   const handleQuickLogTimeOnRow = (rowItem, addMinutes, forceDone = false) => {
     const isLearning = rowItem.Project_ID === "UPSKILLING";
     const currentMins = Number(rowItem.Auto_Learning_Hours || 0) + addMinutes;
@@ -836,7 +866,7 @@ export default function App() {
     } catch (err) {}
   };
 
-  // Create Task or Field Event Row
+  // Add Task Row Submit
   const handleCreateTaskRow = (e) => {
     e.preventDefault();
     if (!quickTitle.trim()) return;
@@ -860,7 +890,7 @@ export default function App() {
       Monday_Commitment: quickTitle.trim(),
       Auto_Task_Hours: 0,
       Auto_Learning_Hours: 0,
-      Friday_Outcome: taskCreationMode,
+      Friday_Outcome: quickTag === "#SchoolVisit" ? "EVENT" : "DELIVERABLE",
       Status: "In Progress",
       Target_Deadline: quickDeadline || todayStr,
       Completed_Date: "",
@@ -877,7 +907,7 @@ export default function App() {
     setQuickTitle("");
     setQuickSubtasksText("");
     setShowCollabPicker(false);
-    showToast(`Added ${taskCreationMode === "EVENT" ? "Field Event" : "Task"}: "${quickTitle.trim()}"!`);
+    showToast(`Added: "${quickTitle.trim()}"!`);
 
     try {
       fetch(APPS_SCRIPT_URL, {
@@ -922,7 +952,6 @@ export default function App() {
     } catch (err) {}
   };
 
-  // Tag Management
   const handleAddNewTag = () => {
     let t = newTagInput.trim();
     if (!t) return;
@@ -994,7 +1023,7 @@ export default function App() {
     } catch (err) {}
   };
 
-  // Safe Add Employee Submit (Eliminates Blank Screen Glitch)
+  // Fixed Onboard Member (No tab duplication, no white screen)
   const handleAddEmployeeSubmit = (e) => {
     e.preventDefault();
     const cleanEmail = (newEmp.email || "").toLowerCase().trim();
@@ -1068,7 +1097,7 @@ export default function App() {
               <span>{currentStreak}d Streak</span>
             </button>
 
-            {/* Active User Switcher (Unrestricted for Testing) */}
+            {/* User Switcher */}
             {employees.length > 0 && (
               <select
                 value={activeEmployeeEmail}
@@ -1132,10 +1161,9 @@ export default function App() {
       {/* ================= MAIN WORKSPACE ================= */}
       <main className="max-w-6xl mx-auto px-4 py-6 flex-1 w-full space-y-5">
 
-        {/* 4 WORKBOOK TABS IN EXACT REQUESTED SEQUENCE */}
+        {/* 4 WORKBOOK TABS */}
         <div className={`flex items-center justify-between border-b ${isDark ? "border-slate-800" : "border-slate-200"}`}>
           <div className="flex items-center gap-1 text-xs sm:text-sm overflow-x-auto">
-            {/* TAB 1: MY TASKS */}
             <button
               type="button"
               onClick={() => setActiveTab("my_tasks")}
@@ -1148,7 +1176,6 @@ export default function App() {
               <ListChecks className="h-4 w-4" /> 1. My Tasks & Sub-Tasks ({activeTasks.length})
             </button>
 
-            {/* TAB 2: LEARNING LOG */}
             <button
               type="button"
               onClick={() => setActiveTab("learning")}
@@ -1161,7 +1188,6 @@ export default function App() {
               <GraduationCap className="h-4 w-4" /> 2. Learning Log ({activeLearningItems.length})
             </button>
 
-            {/* TAB 3: MONTHLY & GOAL REVIEW */}
             <button
               type="button"
               onClick={() => setActiveTab("monthly_review")}
@@ -1174,7 +1200,6 @@ export default function App() {
               <BarChart3 className="h-4 w-4" /> 3. Monthly & Goal Review
             </button>
 
-            {/* TAB 4: COMPANY MASTER VIEW */}
             <button
               type="button"
               onClick={() => setActiveTab("company_master")}
@@ -1189,48 +1214,11 @@ export default function App() {
           </div>
         </div>
 
-        {/* ================= TAB 1: MY TASKS & SUB-TASKS (WITH FIELD EVENT SUPPORT) ================= */}
+        {/* ================= TAB 1: MY TASKS & SUB-TASKS ================= */}
         {activeTab === "my_tasks" && (
           <div className="space-y-4">
-            {/* Task Entry Bar with Mode Toggle */}
+            {/* Task Entry Bar (Single Unified Input) */}
             <form onSubmit={handleCreateTaskRow} className={`p-3.5 rounded-2xl border shadow-sm space-y-2.5 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
-              {/* Mode Switcher: Deliverable vs Field Event */}
-              <div className="flex items-center justify-between pb-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-slate-400">Type:</span>
-                  <div className={`flex p-0.5 rounded-lg border text-xs ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"}`}>
-                    <button
-                      type="button"
-                      onClick={() => { setTaskCreationMode("DELIVERABLE"); setQuickTag("#General"); }}
-                      className={`px-2.5 py-1 rounded-md font-semibold transition flex items-center gap-1 ${
-                        taskCreationMode === "DELIVERABLE"
-                          ? "bg-indigo-600 text-white shadow-sm"
-                          : "text-slate-400"
-                      }`}
-                    >
-                      <Briefcase className="h-3 w-3" /> Deliverable
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setTaskCreationMode("EVENT"); setQuickTag("#SchoolVisit"); }}
-                      className={`px-2.5 py-1 rounded-md font-semibold transition flex items-center gap-1 ${
-                        taskCreationMode === "EVENT"
-                          ? "bg-indigo-600 text-white shadow-sm"
-                          : "text-slate-400"
-                      }`}
-                    >
-                      <MapPin className="h-3 w-3" /> Field Event / School Visit
-                    </button>
-                  </div>
-                </div>
-
-                <span className="text-[11px] text-slate-400 hidden sm:inline">
-                  {taskCreationMode === "EVENT" 
-                    ? "📅 Blocks calendar day with 1-tap Half Day (3h) or Full Day (6h) logs"
-                    : "📋 Sub-task checklist auto-calculates progress %"}
-                </span>
-              </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                 <div className="sm:col-span-4">
                   <input
@@ -1238,7 +1226,7 @@ export default function App() {
                     required
                     value={quickTitle}
                     onChange={(e) => setQuickTitle(e.target.value)}
-                    placeholder={taskCreationMode === "EVENT" ? "Event / Visit (e.g. AMT School Science Mela)" : "Deliverable (e.g. Dexter Grade 6 BOM Costing)"}
+                    placeholder="Task or School Visit (e.g. AMT School Science Mela)"
                     className={`w-full px-3 py-2 rounded-xl text-xs sm:text-sm border focus:outline-none ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-900 focus:bg-white"}`}
                   />
                 </div>
@@ -1248,7 +1236,7 @@ export default function App() {
                     type="text"
                     value={quickSubtasksText}
                     onChange={(e) => setQuickSubtasksText(e.target.value)}
-                    placeholder={taskCreationMode === "EVENT" ? "Optional visit notes..." : "Sub-tasks, comma-separated (e.g. Pack kits, Print posters)"}
+                    placeholder="Sub-tasks, comma-separated (e.g. Pack kits, Print posters)"
                     className={`w-full px-3 py-2 rounded-xl text-xs border focus:outline-none ${isDark ? "bg-slate-950 border-slate-800 text-slate-200" : "bg-slate-50 border-slate-200 text-slate-700 focus:bg-white"}`}
                   />
                 </div>
@@ -1319,6 +1307,9 @@ export default function App() {
                       );
                     })}
                   </div>
+                  <span className="text-[11px] text-slate-400 hidden sm:inline">
+                    Tagging as #SchoolVisit reveals 1-tap Half Day (3h) and Full Day (6h) buttons!
+                  </span>
                 </div>
               )}
             </form>
@@ -1330,10 +1321,10 @@ export default function App() {
                   <thead>
                     <tr className={`border-b text-[11px] uppercase tracking-wider font-semibold ${isDark ? "bg-slate-950/60 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
                       <th className="py-3 px-3 w-10 text-center">Done</th>
-                      <th className="py-3 px-3">Deliverable / Field Event</th>
+                      <th className="py-3 px-3">Deliverable / Visit (Click row to expand)</th>
                       <th className="py-3 px-3 w-28">Project</th>
                       <th className="py-3 px-3 w-32">Activity Tag</th>
-                      <th className="py-3 px-3 w-28">Event Date</th>
+                      <th className="py-3 px-3 w-28">Date</th>
                       <th className="py-3 px-3 w-36">Progress</th>
                       <th className="py-3 px-3 w-20 text-right">Logged</th>
                       <th className="py-3 px-4 w-52 text-right">Log Effort</th>
@@ -1343,7 +1334,7 @@ export default function App() {
                     {activeTasks.length === 0 ? (
                       <tr>
                         <td colSpan="8" className="py-10 text-center text-slate-400 text-xs">
-                          Your active sheet is clear! Add your tasks and field events above.
+                          Your active sheet is clear! Add your tasks and school visits above.
                         </td>
                       </tr>
                     ) : (
@@ -1351,10 +1342,10 @@ export default function App() {
                         const mins = Number(row.Auto_Learning_Hours || 0);
                         const subtasks = parseSubtasks(row);
                         const doneSubCount = subtasks.filter(s => s.done).length;
-                        const isEvent = row.Friday_Outcome === "EVENT";
-                        const prog = isEvent 
-                          ? Number(row.Auto_Task_Hours || 0)
-                          : (subtasks.length > 0 ? Math.round((doneSubCount / subtasks.length) * 100) : Number(row.Auto_Task_Hours || 0));
+                        const isSchoolVisit = (row.Task_Code || "").toLowerCase().includes("schoolvisit");
+                        const prog = subtasks.length > 0
+                          ? Math.round((doneSubCount / subtasks.length) * 100)
+                          : Number(row.Auto_Task_Hours || 0);
 
                         const due = normalizeDateStr(row.Target_Deadline);
                         const isToday = due === todayStr;
@@ -1363,7 +1354,7 @@ export default function App() {
 
                         return (
                           <React.Fragment key={row.Pulse_ID}>
-                            <tr className={`transition ${isDark ? "hover:bg-slate-800/40" : "hover:bg-slate-50/80"} ${isEvent ? (isDark ? "bg-indigo-950/15" : "bg-indigo-50/20") : ""}`}>
+                            <tr className={`transition ${isDark ? "hover:bg-slate-800/40" : "hover:bg-slate-50/80"} ${isSchoolVisit ? (isDark ? "bg-indigo-950/20" : "bg-indigo-50/20") : ""}`}>
                               <td className="py-3 px-3 text-center">
                                 <button
                                   type="button"
@@ -1377,25 +1368,19 @@ export default function App() {
 
                               <td className="py-3 px-3 font-medium">
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  {!isEvent && (
-                                    <button
-                                      type="button"
-                                      onClick={() => setExpandedRowIds(prev => ({ ...prev, [row.Pulse_ID]: !isExpanded }))}
-                                      className="p-0.5 hover:text-indigo-500"
-                                    >
-                                      {isExpanded ? <ChevronDown className="h-4 w-4 text-indigo-500" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
-                                    </button>
-                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedRowIds(prev => ({ ...prev, [row.Pulse_ID]: !isExpanded }))}
+                                    className="p-0.5 hover:text-indigo-500"
+                                  >
+                                    {isExpanded ? <ChevronDown className="h-4 w-4 text-indigo-500" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+                                  </button>
 
-                                  {isEvent && (
-                                    <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-500 text-[10px] font-bold flex items-center gap-0.5">
-                                      <MapPin className="h-3 w-3" /> Visit
-                                    </span>
-                                  )}
+                                  {isSchoolVisit && <MapPin className="h-3 w-3 text-indigo-500 shrink-0" />}
 
                                   <span>{row.Monday_Commitment}</span>
 
-                                  {subtasks.length > 0 && !isEvent && (
+                                  {subtasks.length > 0 && (
                                     <span className={`px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold ${isDark ? "bg-slate-800 text-indigo-300" : "bg-slate-100 text-indigo-700"}`}>
                                       {doneSubCount}/{subtasks.length} ☑
                                     </span>
@@ -1463,9 +1448,9 @@ export default function App() {
                                 {(mins / 60).toFixed(1)}h
                               </td>
 
-                              {/* Action Buttons: 1-Tap Field Day vs Standard Hours */}
+                              {/* Action Buttons: Field Day (3h/6h) for Visits, 30m/1h for Office Tasks */}
                               <td className="py-3 px-4 text-right">
-                                {isEvent ? (
+                                {isSchoolVisit ? (
                                   <div className="inline-flex items-center gap-1">
                                     <button
                                       type="button"
@@ -1519,8 +1504,8 @@ export default function App() {
                               </td>
                             </tr>
 
-                            {/* Expanded Subtasks */}
-                            {isExpanded && !isEvent && (
+                            {/* Sub-Tasks Drawer */}
+                            {isExpanded && (
                               <tr className={isDark ? "bg-slate-950/70" : "bg-indigo-50/30"}>
                                 <td></td>
                                 <td colSpan="7" className="py-3 px-4">
@@ -1605,7 +1590,7 @@ export default function App() {
                     className="font-semibold text-slate-500 hover:text-indigo-500 flex items-center gap-1.5"
                   >
                     <CheckSquare className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>{showCompletedRows ? "Hide" : "Show"} Completed Deliverables ({completedTasks.length})</span>
+                    <span>{showCompletedRows ? "Hide" : "Show"} Completed Tasks ({completedTasks.length})</span>
                   </button>
 
                   {showCompletedRows && (
@@ -1767,7 +1752,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= TAB 3: MONTHLY & GOAL REVIEW (INCLUDES DATE-WISE MATRIX) ================= */}
+        {/* ================= TAB 3: MONTHLY & GOAL REVIEW ================= */}
         {activeTab === "monthly_review" && (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
@@ -1793,7 +1778,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* 1. DATE-WISE WEEKLY TIMESHEET MATRIX (Monday to Saturday Split!) */}
+            {/* 1. DATE-WISE WEEKLY TIMESHEET MATRIX */}
             <div className={`p-5 rounded-2xl border shadow-sm space-y-3 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1823,17 +1808,14 @@ export default function App() {
                     {personalTimesheetMatrix.length === 0 ? (
                       <tr>
                         <td colSpan="9" className="py-6 text-center text-slate-400 italic">
-                          No hours logged yet this week. Use the buttons on your tasks or learning sheet to log effort!
+                          No hours logged yet this week. Log effort on your tasks or learning sheet!
                         </td>
                       </tr>
                     ) : (
                       personalTimesheetMatrix.map((row, idx) => (
                         <tr key={idx} className={`transition ${isDark ? "hover:bg-slate-800/40" : "hover:bg-slate-50/80"}`}>
                           <td className="py-2.5 px-3 font-medium">
-                            <div className="flex items-center gap-1.5">
-                              {row.isEvent && <MapPin className="h-3 w-3 text-indigo-500 shrink-0" />}
-                              <span>{row.title}</span>
-                            </div>
+                            <span>{row.title}</span>
                           </td>
                           <td className="py-2.5 px-2">
                             <span className="px-1.5 py-0.5 rounded bg-slate-500/10 text-[10px] font-medium">
@@ -1947,7 +1929,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= TAB 4: COMPANY MASTER VIEW (WITH DUAL ROADMAP & TIMESHEET MODES) ================= */}
+        {/* ================= TAB 4: COMPANY MASTER VIEW ================= */}
         {activeTab === "company_master" && (
           <div className="space-y-5">
             {/* WEEKLY LAUNCH TOWER WIDGET */}
@@ -1986,56 +1968,10 @@ export default function App() {
               </div>
             </div>
 
-            {/* DYNAMIC CONTEXT-AWARE KPI CARDS */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-              <div className={`p-3.5 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
-                <span className="text-[11px] text-slate-400 block">
-                  {masterKpiStats.filteredMemberName ? `${masterKpiStats.filteredMemberName}'s Tasks` : "All Company Tasks"}
-                </span>
-                <span className="text-xl font-bold font-mono">{masterKpiStats.total}</span>
-                <span className="text-[11px] text-indigo-500 font-semibold block">{masterKpiStats.avgProgress}% completion</span>
-              </div>
-
-              <div className={`p-3.5 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
-                <span className="text-[11px] text-slate-400 block">Completed (100%)</span>
-                <span className="text-xl font-bold font-mono text-emerald-500">{masterKpiStats.completed}</span>
-                <span className="text-[11px] text-slate-400 block">Shipped deliverables</span>
-              </div>
-
-              <div className={`p-3.5 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
-                <span className="text-[11px] text-slate-400 block">In Progress</span>
-                <span className="text-xl font-bold font-mono text-blue-500">{masterKpiStats.inProgress}</span>
-                <span className="text-[11px] text-slate-400 block">Active roadmap</span>
-              </div>
-
-              <div className={`p-3.5 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
-                <span className="text-[11px] text-slate-400 block">Overdue Alerts</span>
-                <span className="text-xl font-bold font-mono text-rose-500">{masterKpiStats.overdue}</span>
-                <span className="text-[11px] text-slate-400 block">Past committed date</span>
-              </div>
-
-              <div className={`p-3.5 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
-                <span className="text-[11px] text-slate-400 block">Invested Effort</span>
-                <span className="text-xl font-bold font-mono text-amber-500">{masterKpiStats.totalHours}h</span>
-                <span className="text-[11px] text-slate-400 block">Combined hours</span>
-              </div>
-            </div>
-
-            {/* View Mode Toggle: Deliverables vs Weekly Timesheet Grid */}
+            {/* Dynamic Filters & Modes (Timesheet / Deliverables / Date Ledger) */}
             <div className={`p-3 rounded-2xl border flex flex-wrap items-center justify-between gap-3 text-xs ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
               <div className="flex items-center gap-2 flex-wrap">
                 <div className={`flex p-0.5 rounded-lg border ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"}`}>
-                  <button
-                    type="button"
-                    onClick={() => setCompanyMasterMode("ROADMAP")}
-                    className={`px-3 py-1.5 rounded-md font-semibold transition flex items-center gap-1.5 ${
-                      companyMasterMode === "ROADMAP"
-                        ? "bg-indigo-600 text-white shadow-sm"
-                        : "text-slate-400"
-                    }`}
-                  >
-                    <ListChecks className="h-3.5 w-3.5" /> Deliverables List
-                  </button>
                   <button
                     type="button"
                     onClick={() => setCompanyMasterMode("TIMESHEET")}
@@ -2045,7 +1981,29 @@ export default function App() {
                         : "text-slate-400"
                     }`}
                   >
-                    <Calendar className="h-3.5 w-3.5" /> Weekly Day-by-Day Matrix
+                    <Calendar className="h-3.5 w-3.5" /> Weekly Day Matrix
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCompanyMasterMode("ROADMAP")}
+                    className={`px-3 py-1.5 rounded-md font-semibold transition flex items-center gap-1.5 ${
+                      companyMasterMode === "ROADMAP"
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : "text-slate-400"
+                    }`}
+                  >
+                    <ListChecks className="h-3.5 w-3.5" /> Deliverables
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCompanyMasterMode("DAILY_LOGS")}
+                    className={`px-3 py-1.5 rounded-md font-semibold transition flex items-center gap-1.5 ${
+                      companyMasterMode === "DAILY_LOGS"
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : "text-slate-400"
+                    }`}
+                  >
+                    <Eye className="h-3.5 w-3.5" /> All Activity Feed
                   </button>
                 </div>
 
@@ -2054,28 +2012,91 @@ export default function App() {
                   onChange={(e) => setCompanyFilterMember(e.target.value)}
                   className={`px-2.5 py-1.5 rounded-lg border font-medium ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"}`}
                 >
-                  <option value="ALL">All Team Members (Company View)</option>
+                  <option value="ALL">All Team Members</option>
                   {employees.map(emp => <option key={emp.Email} value={emp.Email}>{emp.Name || emp.Email}</option>)}
                 </select>
 
-                {companyMasterMode === "ROADMAP" && (
-                  <select
-                    value={companyFilterProject}
-                    onChange={(e) => setCompanyFilterProject(e.target.value)}
-                    className={`px-2.5 py-1.5 rounded-lg border font-medium ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"}`}
-                  >
-                    <option value="ALL">All Projects</option>
-                    {projects.map(p => <option key={p.Project_ID} value={p.Project_ID}>{p.Project_Name}</option>)}
-                  </select>
-                )}
+                <select
+                  value={companyFilterTag}
+                  onChange={(e) => setCompanyFilterTag(e.target.value)}
+                  className={`px-2.5 py-1.5 rounded-lg border font-medium ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"}`}
+                >
+                  <option value="ALL">All Activity Tags</option>
+                  {tags.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
               </div>
 
               <span className="text-slate-400">
-                {companyMasterMode === "TIMESHEET" ? "Mon–Sat date-wise hours logged per deliverable" : "Click any row to inspect sub-tasks"}
+                {companyMasterMode === "TIMESHEET" 
+                  ? "Mon–Sat exact hours per day" 
+                  : companyMasterMode === "DAILY_LOGS"
+                  ? `Showing ${allEmployeesDailyLogFeed.length} logged sessions`
+                  : "Deliverables & sub-tasks"}
               </span>
             </div>
 
-            {/* VIEW 1: ROADMAP TABLE */}
+            {/* 1. WEEKLY TIMESHEET MATRIX TABLE */}
+            {companyMasterMode === "TIMESHEET" && (
+              <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                    <thead>
+                      <tr className={`border-b text-[11px] uppercase font-semibold ${isDark ? "bg-slate-950/60 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
+                        <th className="py-3 px-4">Deliverable / Activity</th>
+                        <th className="py-3 px-3">Project</th>
+                        <th className="py-3 px-3">Tag</th>
+                        {weekDays.map(d => (
+                          <th key={d.label} className={`py-3 px-2 text-center w-16 ${d.dateStr === todayStr ? "text-indigo-500 font-bold" : ""}`}>
+                            {d.label} <span className="text-[10px] opacity-60 block">{d.dateStr.slice(8)}</span>
+                          </th>
+                        ))}
+                        <th className="py-3 px-4 text-right w-20">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-200/70"}`}>
+                      {companyTimesheetMatrix.length === 0 ? (
+                        <tr>
+                          <td colSpan="10" className="py-8 text-center text-slate-400 text-xs">
+                            No team hours logged yet for this week ({currentMondayStr} onwards).
+                          </td>
+                        </tr>
+                      ) : (
+                        companyTimesheetMatrix.map((row, idx) => (
+                          <tr key={idx} className={`transition ${isDark ? "hover:bg-slate-800/40" : "hover:bg-slate-50/80"}`}>
+                            <td className="py-3 px-4 font-medium">
+                              <span>{row.title}</span>
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? "bg-indigo-500/10 text-indigo-300" : "bg-indigo-50 text-indigo-700"}`}>
+                                {getProjectLabel(row.project)}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className="px-1.5 py-0.5 rounded bg-slate-500/10 text-[11px] font-medium">
+                                {row.tag}
+                              </span>
+                            </td>
+                            {weekDays.map(d => {
+                              const mins = row.dayMins[d.label] || 0;
+                              return (
+                                <td key={d.label} className={`py-3 px-2 text-center font-mono ${mins > 0 ? "font-bold text-indigo-400" : "text-slate-500"}`}>
+                                  {mins > 0 ? `${(mins / 60).toFixed(1)}h` : "-"}
+                                </td>
+                              );
+                            })}
+                            <td className="py-3 px-4 text-right font-mono font-bold text-emerald-500">
+                              {row.totalHours}h
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 2. DELIVERABLES ROADMAP TABLE */}
             {companyMasterMode === "ROADMAP" && (
               <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
                 <div className="overflow-x-auto">
@@ -2089,7 +2110,7 @@ export default function App() {
                         <th className="py-3 px-3">Target Date</th>
                         <th className="py-3 px-3">Sub-Tasks</th>
                         <th className="py-3 px-3 w-36">Progress</th>
-                        <th className="py-3 px-4 text-right">Combined Effort</th>
+                        <th className="py-3 px-4 text-right">Effort</th>
                       </tr>
                     </thead>
                     <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-200/70"}`}>
@@ -2105,7 +2126,6 @@ export default function App() {
                           const isOverdue = !isDone && item.targetDeadline && item.targetDeadline < todayStr;
                           const doneSub = item.subtasks.filter(s => s.done).length;
                           const isExp = Boolean(expandedMasterKeys[item.groupKey]);
-                          const isEvent = item.taskType === "EVENT";
 
                           return (
                             <React.Fragment key={item.groupKey}>
@@ -2116,11 +2136,6 @@ export default function App() {
                                 <td className="py-3 px-4 font-medium">
                                   <div className="flex items-center gap-1.5">
                                     {isExp ? <ChevronDown className="h-4 w-4 text-indigo-500" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
-                                    {isEvent && (
-                                      <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-500 text-[10px] font-bold flex items-center gap-0.5">
-                                        <MapPin className="h-3 w-3" /> Visit
-                                      </span>
-                                    )}
                                     <span className={isDone ? "line-through text-slate-400" : ""}>{item.title}</span>
                                     {isOverdue && (
                                       <span className="px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-500 text-[10px] font-semibold">
@@ -2156,7 +2171,7 @@ export default function App() {
                                       {doneSub} / {item.subtasks.length} ☑
                                     </span>
                                   ) : (
-                                    <span className="text-slate-400">{isEvent ? "Full/Half Day" : "1-step"}</span>
+                                    <span className="text-slate-400">1-step</span>
                                   )}
                                 </td>
 
@@ -2214,63 +2229,60 @@ export default function App() {
               </div>
             )}
 
-            {/* VIEW 2: WEEKLY DAY-BY-DAY MATRIX TABLE */}
-            {companyMasterMode === "TIMESHEET" && (
+            {/* 3. LIVE ALL-EMPLOYEES DATE-BY-DATE LOG LEDGER (Exact Date, Name, Task & Hours) */}
+            {companyMasterMode === "DAILY_LOGS" && (
               <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse text-xs sm:text-sm">
                     <thead>
                       <tr className={`border-b text-[11px] uppercase font-semibold ${isDark ? "bg-slate-950/60 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
-                        <th className="py-3 px-4">Deliverable / Field Event</th>
+                        <th className="py-3 px-4">Date</th>
+                        <th className="py-3 px-3">Team Member</th>
+                        <th className="py-3 px-4">Task / Activity Notes</th>
                         <th className="py-3 px-3">Project</th>
                         <th className="py-3 px-3">Tag</th>
-                        {weekDays.map(d => (
-                          <th key={d.label} className={`py-3 px-2 text-center w-16 ${d.dateStr === todayStr ? "text-indigo-500 font-bold" : ""}`}>
-                            {d.label} <span className="text-[10px] opacity-60 block">{d.dateStr.slice(8)}</span>
-                          </th>
-                        ))}
-                        <th className="py-3 px-4 text-right w-20">Total</th>
+                        <th className="py-3 px-4 text-right">Time Logged</th>
                       </tr>
                     </thead>
                     <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-200/70"}`}>
-                      {companyTimesheetMatrix.length === 0 ? (
+                      {allEmployeesDailyLogFeed.length === 0 ? (
                         <tr>
-                          <td colSpan="10" className="py-8 text-center text-slate-400 text-xs">
-                            No team hours logged yet for this week ({currentMondayStr} onwards).
+                          <td colSpan="6" className="py-8 text-center text-slate-400 text-xs">
+                            No logs recorded matching current filter.
                           </td>
                         </tr>
                       ) : (
-                        companyTimesheetMatrix.map((row, idx) => (
-                          <tr key={idx} className={`transition ${isDark ? "hover:bg-slate-800/40" : "hover:bg-slate-50/80"}`}>
-                            <td className="py-3 px-4 font-medium">
-                              <div className="flex items-center gap-1.5">
-                                {row.isEvent && <MapPin className="h-3.5 w-3.5 text-indigo-500 shrink-0" />}
-                                <span>{row.title}</span>
-                              </div>
-                            </td>
-                            <td className="py-3 px-3">
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? "bg-indigo-500/10 text-indigo-300" : "bg-indigo-50 text-indigo-700"}`}>
-                                {getProjectLabel(row.project)}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3">
-                              <span className="px-1.5 py-0.5 rounded bg-slate-500/10 text-[11px] font-medium">
-                                {row.tag}
-                              </span>
-                            </td>
-                            {weekDays.map(d => {
-                              const mins = row.dayMins[d.label] || 0;
-                              return (
-                                <td key={d.label} className={`py-3 px-2 text-center font-mono ${mins > 0 ? "font-bold text-indigo-400" : "text-slate-500"}`}>
-                                  {mins > 0 ? `${(mins / 60).toFixed(1)}h` : "-"}
-                                </td>
-                              );
-                            })}
-                            <td className="py-3 px-4 text-right font-mono font-bold text-emerald-500">
-                              {row.totalHours}h
-                            </td>
-                          </tr>
-                        ))
+                        allEmployeesDailyLogFeed.slice(0, 30).map(log => {
+                          const vt = Number(log.Task_Hours || 0);
+                          const vl = Number(log.Learning_Hours || 0);
+                          const mins = (vt > 24 ? vt : Math.round(vt * 60)) + (vl > 24 ? vl : Math.round(vl * 60));
+                          return (
+                            <tr key={log.Log_ID} className={`transition ${isDark ? "hover:bg-slate-800/40" : "hover:bg-slate-50/80"}`}>
+                              <td className="py-3 px-4 font-mono text-xs text-slate-400">
+                                {normalizeDateStr(log.Date)}
+                              </td>
+                              <td className="py-3 px-3 font-semibold">
+                                {getEmployeeName(log.Emp_Email)}
+                              </td>
+                              <td className="py-3 px-4 font-medium">
+                                {log.Notes || log.Learning_Module_Code || "Execution Session"}
+                              </td>
+                              <td className="py-3 px-3">
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? "bg-indigo-500/10 text-indigo-300" : "bg-indigo-50 text-indigo-700"}`}>
+                                  {getProjectLabel(log.Project_ID)}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3">
+                                <span className="px-1.5 py-0.5 rounded bg-slate-500/10 text-[11px] font-medium">
+                                  {log.Task_Code || "#General"}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right font-mono font-bold text-emerald-500">
+                                {(mins / 60).toFixed(1)}h ({mins}m)
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -2280,57 +2292,6 @@ export default function App() {
           </div>
         )}
       </main>
-
-      {/* ================= SAFE ONBOARD MEMBER MODAL (GLITCH FIXED) ================= */}
-      {showEmpModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className={`border rounded-2xl max-w-md w-full p-5 shadow-xl space-y-3 text-xs ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
-            <div className="flex justify-between items-center">
-              <h3 className="text-sm font-bold flex items-center gap-1.5">
-                <UserPlus className="h-4 w-4 text-indigo-500" /> Onboard Team Member
-              </h3>
-              <button type="button" onClick={() => setShowEmpModal(false)}><X className="h-4 w-4" /></button>
-            </div>
-            <form onSubmit={handleAddEmployeeSubmit} className="space-y-3">
-              <input 
-                required 
-                type="text" 
-                value={newEmp.name} 
-                onChange={e => setNewEmp({...newEmp, name: e.target.value})} 
-                className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} 
-                placeholder="Full Name (e.g. Durga Devi)" 
-              />
-              <input 
-                required 
-                type="email" 
-                value={newEmp.email} 
-                onChange={e => setNewEmp({...newEmp, email: e.target.value})} 
-                className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} 
-                placeholder="Work Email (e.g. durga@infiniteengineers.in)" 
-              />
-              <input 
-                required 
-                type="text" 
-                value={newEmp.roleTitle} 
-                onChange={e => setNewEmp({...newEmp, roleTitle: e.target.value})} 
-                className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} 
-                placeholder="Role Title (e.g. Lead STEM Facilitator)" 
-              />
-              <textarea 
-                rows="3" 
-                value={newEmp.rnrSummary} 
-                onChange={e => setNewEmp({...newEmp, rnrSummary: e.target.value})} 
-                className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} 
-                placeholder="Core Responsibilities / Monthly KRAs..." 
-              />
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setShowEmpModal(false)} className="px-3 py-2 text-slate-400">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl">Save Member</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* ================= TAGS & PROJECTS MANAGER DRAWER ================= */}
       {showLibraryManager && (
@@ -2595,6 +2556,57 @@ export default function App() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= ONBOARD MEMBER MODAL ================= */}
+      {showEmpModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`border rounded-2xl max-w-md w-full p-5 shadow-xl space-y-3 text-xs ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-bold flex items-center gap-1.5">
+                <UserPlus className="h-4 w-4 text-indigo-500" /> Onboard Team Member
+              </h3>
+              <button type="button" onClick={() => setShowEmpModal(false)}><X className="h-4 w-4" /></button>
+            </div>
+            <form onSubmit={handleAddEmployeeSubmit} className="space-y-3">
+              <input 
+                required 
+                type="text" 
+                value={newEmp.name} 
+                onChange={e => setNewEmp({...newEmp, name: e.target.value})} 
+                className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} 
+                placeholder="Full Name (e.g. Durga Devi)" 
+              />
+              <input 
+                required 
+                type="email" 
+                value={newEmp.email} 
+                onChange={e => setNewEmp({...newEmp, email: e.target.value})} 
+                className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} 
+                placeholder="Work Email (e.g. durga@infiniteengineers.in)" 
+              />
+              <input 
+                required 
+                type="text" 
+                value={newEmp.roleTitle} 
+                onChange={e => setNewEmp({...newEmp, roleTitle: e.target.value})} 
+                className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} 
+                placeholder="Role Title (e.g. Lead STEM Facilitator)" 
+              />
+              <textarea 
+                rows="3" 
+                value={newEmp.rnrSummary} 
+                onChange={e => setNewEmp({...newEmp, rnrSummary: e.target.value})} 
+                className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} 
+                placeholder="Core Responsibilities / Monthly KRAs..." 
+              />
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setShowEmpModal(false)} className="px-3 py-2 text-slate-400">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl">Save Member</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
