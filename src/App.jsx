@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Flame, CheckCircle, Clock, BookOpen, Building2, 
   RefreshCw, FolderPlus, UserPlus, CalendarCheck, 
@@ -108,14 +108,116 @@ function getMondayOfDate(dStr) {
   return `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
 }
 
+// ================= SEARCHABLE AUTO-COMPLETE COMBOBOX WITH ON-THE-FLY TAG CREATION =================
+function SearchableTagCombobox({ value, onChange, availableTags, onAddNewTag, isDark, placeholder = "Tag..." }) {
+  const [query, setQuery] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  const cleanQuery = query.trim().startsWith("#") ? query.trim() : `#${query.trim().replace(/\s+/g, "")}`;
+  const filtered = availableTags.filter(t => 
+    t.toLowerCase().includes(query.toLowerCase().replace(/^#/, ""))
+  );
+  const isExactMatch = availableTags.some(t => t.toLowerCase() === cleanQuery.toLowerCase());
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSelect = (tag) => {
+    onChange(tag);
+    setQuery("");
+    setIsOpen(false);
+  };
+
+  const handleCreate = () => {
+    if (!cleanQuery || cleanQuery === "#") return;
+    onAddNewTag(cleanQuery);
+    onChange(cleanQuery);
+    setQuery("");
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <div 
+        onClick={() => setIsOpen(true)}
+        className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-medium border cursor-pointer transition ${
+          isDark 
+            ? "bg-slate-950 border-slate-800 text-indigo-300 hover:border-slate-700" 
+            : "bg-slate-50 border-slate-200 text-indigo-700 hover:border-slate-300"
+        }`}
+      >
+        <span className="truncate">{value || placeholder}</span>
+        <ChevronDown className="h-3 w-3 opacity-50 shrink-0 ml-1" />
+      </div>
+
+      {isOpen && (
+        <div className={`absolute top-full left-0 mt-1 w-52 max-h-56 overflow-y-auto rounded-xl border shadow-2xl z-50 text-xs divide-y ${
+          isDark ? "bg-slate-900 border-slate-800 divide-slate-800" : "bg-white border-slate-200 divide-slate-100"
+        }`}>
+          <div className="p-1.5">
+            <input
+              autoFocus
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Type to filter or add #tag..."
+              className={`w-full px-2 py-1 rounded-lg text-xs border focus:outline-none ${
+                isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
+              }`}
+            />
+          </div>
+
+          <div className="max-h-40 overflow-y-auto">
+            {filtered.length > 0 ? (
+              filtered.map(t => (
+                <div
+                  key={t}
+                  onClick={() => handleSelect(t)}
+                  className={`px-3 py-1.5 cursor-pointer flex items-center justify-between transition ${
+                    isDark ? "hover:bg-slate-800 text-slate-200" : "hover:bg-slate-50 text-slate-800"
+                  } ${value === t ? "font-bold text-indigo-500" : ""}`}
+                >
+                  <span>{t}</span>
+                  {value === t && <Check className="h-3.5 w-3.5 text-indigo-500" />}
+                </div>
+              ))
+            ) : (
+              <div className="p-2 text-slate-400 text-center text-[11px]">No matching tag found</div>
+            )}
+          </div>
+
+          {query.trim().length > 1 && !isExactMatch && (
+            <div
+              onClick={handleCreate}
+              className={`p-2 cursor-pointer font-semibold text-indigo-500 flex items-center gap-1.5 ${
+                isDark ? "bg-indigo-500/10 hover:bg-indigo-500/20" : "bg-indigo-50 hover:bg-indigo-100"
+              }`}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Create: <strong>{cleanQuery}</strong></span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("ie_theme") || "light");
-  const [activeTab, setActiveTab] = useState("my_tasks"); // 'my_tasks' | 'learning' | 'monthly_review' | 'company_master'
+  const [activeTab, setActiveTab] = useState("my_tasks");
   const [activeEmployeeEmail, setActiveEmployeeEmail] = useState(() => localStorage.getItem("ie_v3_active_emp") || "");
 
   useEffect(() => { localStorage.setItem("ie_theme", theme); }, [theme]);
 
-  // Master Data Lists (Synced with Sheet + Local Storage)
   const [employees, setEmployees] = useState(() => JSON.parse(localStorage.getItem("ie_v3_employees") || "[]"));
   const [projects, setProjects] = useState(() => mergeById(JSON.parse(localStorage.getItem("ie_v3_projects") || "[]"), DEFAULT_PROJECTS, "Project_ID"));
   const [tags, setTags] = useState(() => {
@@ -137,7 +239,7 @@ export default function App() {
   const [selectedCollaborators, setSelectedCollaborators] = useState([]);
   const [showCollabPicker, setShowCollabPicker] = useState(false);
 
-  // Learning Bucket Form (Add to queue, log hours later!)
+  // Learning Bucket Form
   const [newLearningTopic, setNewLearningTopic] = useState("");
   const [newLearningTag, setNewLearningTag] = useState("#R&D");
 
@@ -147,7 +249,7 @@ export default function App() {
   const [showCompletedRows, setShowCompletedRows] = useState(false);
   const [showCompletedLearning, setShowCompletedLearning] = useState(false);
 
-  // Guarded Completion (No 0-Hour completions)
+  // Guarded Completion
   const [completionGuardTarget, setCompletionGuardTarget] = useState(null);
   const [guardDurationInput, setGuardDurationInput] = useState(60);
 
@@ -157,7 +259,7 @@ export default function App() {
   // Modals & Drawers
   const [showStreakModal, setShowStreakModal] = useState(false);
   const [showGpModal, setShowGpModal] = useState(false);
-  const [showLibraryManager, setShowLibraryManager] = useState(false); // Tag & Project Manager Drawer
+  const [showLibraryManager, setShowLibraryManager] = useState(false);
   const [showEmpModal, setShowEmpModal] = useState(false);
 
   // Library Manager New Inputs
@@ -209,6 +311,10 @@ export default function App() {
         if (data.projects?.length > 0) {
           setProjects(prev => mergeById(data.projects, prev, "Project_ID"));
         }
+        if (data.tasks?.length > 0) {
+          const remoteTags = data.tasks.map(t => t.Task_Code).filter(t => t && t.startsWith("#"));
+          if (remoteTags.length > 0) setTags(prev => Array.from(new Set([...prev, ...remoteTags])));
+        }
         if (data.weeklyPulses) {
           setWeeklyPulses(prev => {
             const remoteMap = new Map();
@@ -247,16 +353,13 @@ export default function App() {
 
   const currentStreak = useMemo(() => calculateUniqueDayStreak(empDailyLogs), [empDailyLogs]);
 
-  // Tasks Filter (Separating Standard Work from Learning Bucket)
   const empAllPulses = useMemo(() => {
     return weeklyPulses.filter(p => (p.Emp_Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase());
   }, [weeklyPulses, activeEmployeeEmail]);
 
-  // Standard Work Tasks
   const activeTasks = useMemo(() => empAllPulses.filter(p => p.Project_ID !== "UPSKILLING" && Number(p.Auto_Task_Hours || 0) < 100), [empAllPulses]);
   const completedTasks = useMemo(() => empAllPulses.filter(p => p.Project_ID !== "UPSKILLING" && Number(p.Auto_Task_Hours || 0) >= 100), [empAllPulses]);
 
-  // Dedicated Learning Bucket (Can plan topics, then log hours later!)
   const activeLearningItems = useMemo(() => empAllPulses.filter(p => p.Project_ID === "UPSKILLING" && Number(p.Auto_Task_Hours || 0) < 100), [empAllPulses]);
   const completedLearningItems = useMemo(() => empAllPulses.filter(p => p.Project_ID === "UPSKILLING" && Number(p.Auto_Task_Hours || 0) >= 100), [empAllPulses]);
 
@@ -270,7 +373,24 @@ export default function App() {
     return found ? found.Name : email;
   };
 
-  // ================= PERSONAL GP LEDGER =================
+  // Add a newly typed tag on the fly
+  const handleAddNewTagOnTheFly = (newTag) => {
+    let t = newTag.trim();
+    if (!t) return;
+    if (!t.startsWith("#")) t = "#" + t.replace(/\s+/g, "");
+    if (!tags.includes(t)) {
+      setTags(prev => [...prev, t]);
+      try {
+        fetch(APPS_SCRIPT_URL, {
+          method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({ action: "saveTag", tag: t })
+        });
+      } catch (err) {}
+      showToast(`Created new tag ${t}`);
+    }
+  };
+
+  // Personal GP Ledger
   const personalGpData = useMemo(() => {
     let totalGp = 0;
     const history = [];
@@ -307,7 +427,7 @@ export default function App() {
     return { totalGp, history: history.slice(0, 15) };
   }, [completedTasks, empDailyLogs, todayStr]);
 
-  // ================= DYNAMIC WEEKLY TOWER RECORD ENGINE =================
+  // Weekly Tower Record Engine
   const towerData = useMemo(() => {
     const weeklyPointsMap = {};
 
@@ -343,7 +463,6 @@ export default function App() {
     const delta = currentWkPoints - lastWkPoints;
 
     const allScores = Object.values(weeklyPointsMap);
-    // Highest Record is computed dynamically from team history (defaults to 1,500 target if first sprint)
     const recordHeight = allScores.length > 0 ? Math.max(...allScores, 1500) : 1500;
     const last4 = allScores.slice(-4);
     const rollingAvg = last4.length > 0 ? Math.round(last4.reduce((a, b) => a + b, 0) / last4.length) : currentWkPoints;
@@ -375,7 +494,7 @@ export default function App() {
     };
   }, [weeklyPulses, dailyLogs, currentMondayStr, todayStr]);
 
-  // ================= COMPANY MASTER VIEW DATA =================
+  // Company Master View Aggregation
   const companyMasterTasks = useMemo(() => {
     const groupedMap = new Map();
 
@@ -449,7 +568,7 @@ export default function App() {
     };
   }, [companyMasterTasks, companyFilterMember, todayStr, employees]);
 
-  // ================= MONTHLY & GOAL REVIEW DATA =================
+  // Monthly Review Data
   const reviewMetrics = useMemo(() => {
     const currentMonthPrefix = todayStr.slice(0, 7);
     const periodLogs = empDailyLogs.filter(l => {
@@ -497,7 +616,7 @@ export default function App() {
     };
   }, [empDailyLogs, reviewPeriod, currentMondayStr, todayStr, empAllPulses, completedTasks]);
 
-  // ================= SUB-TASK ENGINE & AUTO PROGRESS =================
+  // Subtask Sync & Auto-Progress
   const syncSubtasksAndProgress = (rowItem, updatedSubtasks) => {
     const totalSub = updatedSubtasks.length;
     const doneSub = updatedSubtasks.filter(s => s.done).length;
@@ -563,7 +682,7 @@ export default function App() {
     syncSubtasksAndProgress(rowItem, updated);
   };
 
-  // ================= 1-TAP TIME LOGGING ON ROWS (WORKS FOR BOTH TASKS & LEARNING) =================
+  // 1-Tap Time Logging
   const handleQuickLogTimeOnRow = (rowItem, addMinutes, forceDone = false) => {
     const isLearning = rowItem.Project_ID === "UPSKILLING";
     const currentMins = Number(rowItem.Auto_Learning_Hours || 0) + addMinutes;
@@ -714,7 +833,7 @@ export default function App() {
     } catch (err) {}
   };
 
-  // Add Item to Learning Bucket (Can log hours multiple times later!)
+  // Add Item to Learning Bucket
   const handleCreateLearningItem = (e) => {
     e.preventDefault();
     if (!newLearningTopic.trim()) return;
@@ -749,11 +868,11 @@ export default function App() {
     } catch (err) {}
   };
 
-  // ================= TAG & PROJECT MANAGER ACTIONS =================
+  // Library Manager Add Tag
   const handleAddNewTag = () => {
     let t = newTagInput.trim();
     if (!t) return;
-    if (!t.startsWith("#")) t = "#" + t;
+    if (!t.startsWith("#")) t = "#" + t.replace(/\s+/g, "");
     if (tags.includes(t)) {
       showToast("Tag already exists!");
       return;
@@ -875,7 +994,7 @@ export default function App() {
               </select>
             )}
 
-            {/* Manage Tags & Projects Drawer Button */}
+            {/* Manage Tags & Projects Button */}
             <button
               type="button"
               onClick={() => setShowLibraryManager(true)}
@@ -985,7 +1104,7 @@ export default function App() {
         {/* ================= TAB 1: MY TASKS & SUB-TASKS ================= */}
         {activeTab === "my_tasks" && (
           <div className="space-y-4">
-            {/* Task Entry Bar */}
+            {/* Task Entry Bar with Searchable Tag Combobox */}
             <form onSubmit={handleCreateTaskRow} className={`p-3.5 rounded-2xl border shadow-sm space-y-2.5 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                 <div className="sm:col-span-4">
@@ -1019,14 +1138,16 @@ export default function App() {
                   </select>
                 </div>
 
+                {/* Searchable Tag Combobox (Replaced rigid dropdown) */}
                 <div className="sm:col-span-1">
-                  <select
+                  <SearchableTagCombobox
                     value={quickTag}
-                    onChange={(e) => setQuickTag(e.target.value)}
-                    className={`w-full px-2 py-2 rounded-xl text-xs font-medium border ${isDark ? "bg-slate-950 border-slate-800 text-indigo-300" : "bg-slate-50 border-slate-200 text-indigo-700"}`}
-                  >
-                    {tags.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
+                    onChange={setQuickTag}
+                    availableTags={tags}
+                    onAddNewTag={handleAddNewTagOnTheFly}
+                    isDark={isDark}
+                    placeholder="#Tag"
+                  />
                 </div>
 
                 <div className="sm:col-span-2 flex items-center gap-1.5">
@@ -1090,7 +1211,7 @@ export default function App() {
                       <th className="py-3 px-3 w-10 text-center">Done</th>
                       <th className="py-3 px-3">Deliverable & Sub-Tasks (Click row to expand)</th>
                       <th className="py-3 px-3 w-28">Project</th>
-                      <th className="py-3 px-3 w-28">Activity Tag</th>
+                      <th className="py-3 px-3 w-32">Activity Tag</th>
                       <th className="py-3 px-3 w-28">Due Date</th>
                       <th className="py-3 px-3 w-36">Sub-Task Progress</th>
                       <th className="py-3 px-3 w-20 text-right">Logged</th>
@@ -1190,14 +1311,15 @@ export default function App() {
                                 </select>
                               </td>
 
+                              {/* Searchable Combobox inside row cell */}
                               <td className="py-3 px-3">
-                                <select
+                                <SearchableTagCombobox
                                   value={row.Task_Code || "#General"}
-                                  onChange={(e) => handleUpdateRowAttribute(row.Pulse_ID, "Task_Code", e.target.value)}
-                                  className={`px-1.5 py-0.5 rounded text-[11px] font-medium border ${isDark ? "bg-slate-900 border-slate-700 text-slate-300" : "bg-slate-100 border-slate-200 text-slate-700"}`}
-                                >
-                                  {tags.map(t => <option key={t} value={t}>{t}</option>)}
-                                </select>
+                                  onChange={(newTag) => handleUpdateRowAttribute(row.Pulse_ID, "Task_Code", newTag)}
+                                  availableTags={tags}
+                                  onAddNewTag={handleAddNewTagOnTheFly}
+                                  isDark={isDark}
+                                />
                               </td>
 
                               <td className="py-3 px-3 text-xs font-mono">
@@ -1355,10 +1477,9 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= TAB 2: LEARNING LOG (DEDICATED QUEUE WITH +30m/+1h BUTTONS) ================= */}
+        {/* ================= TAB 2: LEARNING LOG (WITH COMBOBOX) ================= */}
         {activeTab === "learning" && (
           <div className="space-y-4">
-            {/* Add to Learning Bucket Form */}
             <form onSubmit={handleCreateLearningItem} className={`p-3.5 rounded-2xl border shadow-sm space-y-2 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-indigo-500 flex items-center gap-1.5">
@@ -1382,13 +1503,14 @@ export default function App() {
                 </div>
 
                 <div className="sm:col-span-3">
-                  <select
+                  <SearchableTagCombobox
                     value={newLearningTag}
-                    onChange={(e) => setNewLearningTag(e.target.value)}
-                    className={`w-full px-2.5 py-2 rounded-xl text-xs font-medium border ${isDark ? "bg-slate-950 border-slate-800 text-purple-300" : "bg-slate-50 border-slate-200 text-purple-700"}`}
-                  >
-                    {tags.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
+                    onChange={setNewLearningTag}
+                    availableTags={tags}
+                    onAddNewTag={handleAddNewTagOnTheFly}
+                    isDark={isDark}
+                    placeholder="#Tag"
+                  />
                 </div>
 
                 <div className="sm:col-span-1">
@@ -1402,7 +1524,6 @@ export default function App() {
               </div>
             </form>
 
-            {/* Learning Queue Table with +30m and +1h buttons */}
             <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
               <table className="w-full text-left border-collapse text-xs sm:text-sm">
                 <thead>
@@ -1902,7 +2023,6 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Tag Pills with Delete Option */}
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {tags.map(t => (
                   <span
@@ -1953,7 +2073,6 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Projects List with Delete Option */}
               <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                 {projects.map(p => (
                   <div
