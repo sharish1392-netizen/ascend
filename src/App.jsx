@@ -6,10 +6,10 @@ import {
   Edit3, Rocket, Check, X, Sun, Moon, Table, 
   CheckSquare, Square, ChevronRight, ChevronDown, 
   AlertCircle, ListChecks, Filter, Tag, Calendar, 
-  Award, TrendingUp, Settings, Sliders
+  Award, TrendingUp, Settings, Sliders, MapPin, Briefcase
 } from 'lucide-react';
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyOjJQ320CycSnIJnY2Q3Db2I9smikXEW-Q6rMJYygpkThESnr0XoppWaEKB7CptFg2/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnW8cS7n3pusA4sHYN1NJOPHqKR38G4_qAa0VxnU-mKrFDsGjczS0TV5YFZoJaTtK-/exec";
 
 const DEFAULT_PROJECTS = [
   { Project_ID: "PRJ-DEXTER", Project_Name: "Dexter Box", Full_Name: "Dexter Box Science Kits" },
@@ -21,8 +21,8 @@ const DEFAULT_PROJECTS = [
 ];
 
 const DEFAULT_TAGS = [
-  "#Meeting",
   "#SchoolVisit",
+  "#Meeting",
   "#ClientFollowup",
   "#Proposal",
   "#BOMCosting",
@@ -58,6 +58,14 @@ function normalizeDateStr(val) {
   return str;
 }
 
+function getMondayOfDate(dStr) {
+  const d = new Date(dStr);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const mon = new Date(d.setDate(diff));
+  return `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
+}
+
 function mergeById(remoteArr, localArr, idKey) {
   const map = new Map();
   (remoteArr || []).forEach(item => { if (item && item[idKey]) map.set(item[idKey], item); });
@@ -75,6 +83,21 @@ function parseSubtasks(row) {
     } catch (e) {}
   }
   return [];
+}
+
+// Resilient LocalStorage Loader (Guards against corrupted null objects)
+function safeLoadJson(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(fallback)) {
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : fallback;
+    }
+    return parsed || fallback;
+  } catch (e) {
+    return fallback;
+  }
 }
 
 function calculateUniqueDayStreak(userLogs) {
@@ -100,15 +123,23 @@ function calculateUniqueDayStreak(userLogs) {
   return streak;
 }
 
-function getMondayOfDate(dStr) {
-  const d = new Date(dStr);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  const mon = new Date(d.setDate(diff));
-  return `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
+// Days of Current Week
+function getWeekDates(mondayStr) {
+  const mon = new Date(mondayStr);
+  const days = [];
+  const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  for (let i = 0; i < 6; i++) {
+    const cur = new Date(mon);
+    cur.setDate(mon.getDate() + i);
+    days.push({
+      label: labels[i],
+      dateStr: normalizeDateStr(cur.toISOString())
+    });
+  }
+  return days;
 }
 
-// ================= SEARCHABLE AUTO-COMPLETE COMBOBOX WITH ON-THE-FLY TAG CREATION =================
+// ================= AUTO-COMPLETE COMBOBOX WITH ON-THE-FLY CREATION =================
 function SearchableTagCombobox({ value, onChange, availableTags, onAddNewTag, isDark, placeholder = "Tag..." }) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -213,27 +244,27 @@ function SearchableTagCombobox({ value, onChange, availableTags, onAddNewTag, is
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("ie_theme") || "light");
-  const [activeTab, setActiveTab] = useState("my_tasks");
+  const [activeTab, setActiveTab] = useState("my_tasks"); // 'my_tasks' | 'learning' | 'monthly_review' | 'company_master'
   const [activeEmployeeEmail, setActiveEmployeeEmail] = useState(() => localStorage.getItem("ie_v3_active_emp") || "");
 
   useEffect(() => { localStorage.setItem("ie_theme", theme); }, [theme]);
 
-  const [employees, setEmployees] = useState(() => JSON.parse(localStorage.getItem("ie_v3_employees") || "[]"));
-  const [projects, setProjects] = useState(() => mergeById(JSON.parse(localStorage.getItem("ie_v3_projects") || "[]"), DEFAULT_PROJECTS, "Project_ID"));
-  const [tags, setTags] = useState(() => {
-    const saved = localStorage.getItem("ie_v8_tags");
-    return saved ? JSON.parse(saved) : DEFAULT_TAGS;
-  });
-  const [weeklyPulses, setWeeklyPulses] = useState(() => JSON.parse(localStorage.getItem("ie_v3_pulses") || "[]"));
-  const [dailyLogs, setDailyLogs] = useState(() => JSON.parse(localStorage.getItem("ie_v3_logs") || "[]"));
+  // Safe State Loading (Protects against blank screens)
+  const [employees, setEmployees] = useState(() => safeLoadJson("ie_v3_employees", []));
+  const [projects, setProjects] = useState(() => mergeById(safeLoadJson("ie_v3_projects", []), DEFAULT_PROJECTS, "Project_ID"));
+  const [tags, setTags] = useState(() => safeLoadJson("ie_v8_tags", DEFAULT_TAGS));
+  const [weeklyPulses, setWeeklyPulses] = useState(() => safeLoadJson("ie_v3_pulses", []));
+  const [dailyLogs, setDailyLogs] = useState(() => safeLoadJson("ie_v3_logs", []));
 
   const todayStr = getTodayStr();
   const currentMondayStr = getCurrentMondayStr();
+  const weekDays = useMemo(() => getWeekDates(currentMondayStr), [currentMondayStr]);
 
-  // Create Task Form
+  // Task Creation Mode: Deliverable (Standard) vs. Field Event (School Visit)
+  const [taskCreationMode, setTaskCreationMode] = useState("DELIVERABLE"); // 'DELIVERABLE' | 'EVENT'
   const [quickTitle, setQuickTitle] = useState("");
   const [quickProject, setQuickProject] = useState("PRJ-MAKER");
-  const [quickTag, setQuickTag] = useState("#General");
+  const [quickTag, setQuickTag] = useState("#SchoolVisit");
   const [quickDeadline, setQuickDeadline] = useState(todayStr);
   const [quickSubtasksText, setQuickSubtasksText] = useState("");
   const [selectedCollaborators, setSelectedCollaborators] = useState([]);
@@ -243,18 +274,15 @@ export default function App() {
   const [newLearningTopic, setNewLearningTopic] = useState("");
   const [newLearningTag, setNewLearningTag] = useState("#R&D");
 
-  // Expanded Subtasks
+  // Expanded Rows & Drawers
   const [expandedRowIds, setExpandedRowIds] = useState({});
   const [newSubtaskInputs, setNewSubtaskInputs] = useState({});
   const [showCompletedRows, setShowCompletedRows] = useState(false);
   const [showCompletedLearning, setShowCompletedLearning] = useState(false);
 
-  // Guarded Completion
+  // Guarded Completion (No 0-Hour completions)
   const [completionGuardTarget, setCompletionGuardTarget] = useState(null);
   const [guardDurationInput, setGuardDurationInput] = useState(60);
-
-  // In-Place Cell Editing
-  const [editingCell, setEditingCell] = useState(null);
 
   // Modals & Drawers
   const [showStreakModal, setShowStreakModal] = useState(false);
@@ -262,17 +290,19 @@ export default function App() {
   const [showLibraryManager, setShowLibraryManager] = useState(false);
   const [showEmpModal, setShowEmpModal] = useState(false);
 
-  // Library Manager New Inputs
+  // Employee Form State (Protected with clean defaults)
+  const [newEmp, setNewEmp] = useState({ name: "", email: "", roleTitle: "STEM Facilitator", department: "Training & Delivery", level: "L3 Advanced", rnrSummary: "" });
   const [newTagInput, setNewTagInput] = useState("");
   const [newPrjCode, setNewPrjCode] = useState("");
   const [newPrjName, setNewPrjName] = useState("");
 
   // Review & R&R
-  const [reviewPeriod, setReviewPeriod] = useState("MONTH");
+  const [reviewPeriod, setReviewPeriod] = useState("WEEK");
   const [isEditingRnR, setIsEditingRnR] = useState(false);
   const [rnrDraft, setRnrDraft] = useState("");
 
-  // Company Filters
+  // Company Master View Modes
+  const [companyMasterMode, setCompanyMasterMode] = useState("ROADMAP"); // 'ROADMAP' | 'TIMESHEET'
   const [companyFilterProject, setCompanyFilterProject] = useState("ALL");
   const [companyFilterMember, setCompanyFilterMember] = useState("ALL");
   const [companyFilterStatus, setCompanyFilterStatus] = useState("ALL");
@@ -286,6 +316,7 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  // Safe Persistence
   useEffect(() => { localStorage.setItem("ie_v3_employees", JSON.stringify(employees)); }, [employees]);
   useEffect(() => { localStorage.setItem("ie_v3_projects", JSON.stringify(projects)); }, [projects]);
   useEffect(() => { localStorage.setItem("ie_v8_tags", JSON.stringify(tags)); }, [tags]);
@@ -305,8 +336,9 @@ export default function App() {
       const data = await res.json();
       if (data.status === "success") {
         if (data.employees?.length > 0) {
-          setEmployees(prev => mergeById(data.employees, prev, "Email"));
-          if (!activeEmployeeEmail) setActiveEmployeeEmail(data.employees[0].Email);
+          const cleanEmps = data.employees.filter(e => e && e.Email);
+          setEmployees(prev => mergeById(cleanEmps, prev, "Email"));
+          if (!activeEmployeeEmail && cleanEmps[0]) setActiveEmployeeEmail(cleanEmps[0].Email);
         }
         if (data.projects?.length > 0) {
           setProjects(prev => mergeById(data.projects, prev, "Project_ID"));
@@ -336,25 +368,30 @@ export default function App() {
 
   useEffect(() => { fetchSheetData(); }, []);
 
-  const currentEmp = employees.find(e => (e.Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase()) || {
-    Name: "Team Member",
-    Email: activeEmployeeEmail || "",
-    Role_Title: "Onboard in Top Bar",
-    Department: "Infinite Engineers",
-    Level: "L3",
-    "R&R_Summary": "Click 'Edit' to document your monthly core responsibilities and KRAs."
-  };
+  // Safe Current Employee Object
+  const currentEmp = useMemo(() => {
+    const found = employees.find(e => e && e.Email && (e.Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase());
+    return found || {
+      Name: "Team Member",
+      Email: activeEmployeeEmail || "",
+      Role_Title: "Facilitator",
+      Department: "Infinite Engineers",
+      Level: "L3",
+      "R&R_Summary": "Click 'Edit' to document your monthly core responsibilities and KRAs."
+    };
+  }, [employees, activeEmployeeEmail]);
 
   useEffect(() => { setRnrDraft(currentEmp["R&R_Summary"] || ""); }, [currentEmp]);
 
   const empDailyLogs = useMemo(() => {
-    return dailyLogs.filter(l => (l.Emp_Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase());
+    return dailyLogs.filter(l => l && (l.Emp_Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase());
   }, [dailyLogs, activeEmployeeEmail]);
 
   const currentStreak = useMemo(() => calculateUniqueDayStreak(empDailyLogs), [empDailyLogs]);
 
+  // Tasks Filter
   const empAllPulses = useMemo(() => {
-    return weeklyPulses.filter(p => (p.Emp_Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase());
+    return weeklyPulses.filter(p => p && (p.Emp_Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase());
   }, [weeklyPulses, activeEmployeeEmail]);
 
   const activeTasks = useMemo(() => empAllPulses.filter(p => p.Project_ID !== "UPSKILLING" && Number(p.Auto_Task_Hours || 0) < 100), [empAllPulses]);
@@ -364,16 +401,16 @@ export default function App() {
   const completedLearningItems = useMemo(() => empAllPulses.filter(p => p.Project_ID === "UPSKILLING" && Number(p.Auto_Task_Hours || 0) >= 100), [empAllPulses]);
 
   const getProjectLabel = (prjId) => {
-    const found = projects.find(p => p.Project_ID === prjId);
+    const found = projects.find(p => p && p.Project_ID === prjId);
     return found ? (found.Project_Name || found.Full_Name || prjId) : prjId;
   };
 
   const getEmployeeName = (email) => {
-    const found = employees.find(e => (e.Email || "").toLowerCase() === (email || "").toLowerCase().trim());
+    if (!email) return "Member";
+    const found = employees.find(e => e && e.Email && e.Email.toLowerCase() === email.toLowerCase().trim());
     return found ? found.Name : email;
   };
 
-  // Add a newly typed tag on the fly
   const handleAddNewTagOnTheFly = (newTag) => {
     let t = newTag.trim();
     if (!t) return;
@@ -427,7 +464,7 @@ export default function App() {
     return { totalGp, history: history.slice(0, 15) };
   }, [completedTasks, empDailyLogs, todayStr]);
 
-  // Weekly Tower Record Engine
+  // Weekly Tower Record
   const towerData = useMemo(() => {
     const weeklyPointsMap = {};
 
@@ -494,16 +531,17 @@ export default function App() {
     };
   }, [weeklyPulses, dailyLogs, currentMondayStr, todayStr]);
 
-  // Company Master View Aggregation
+  // Company Master Roadmap Aggregation
   const companyMasterTasks = useMemo(() => {
     const groupedMap = new Map();
 
-    weeklyPulses.filter(p => p.Project_ID !== "UPSKILLING").forEach(p => {
+    weeklyPulses.filter(p => p && p.Project_ID !== "UPSKILLING").forEach(p => {
       const key = `${(p.Project_ID || "").toUpperCase()}::${(p.Monday_Commitment || "").trim().toLowerCase()}`;
       const existing = groupedMap.get(key);
       const mins = Number(p.Auto_Learning_Hours || 0);
       const prog = Number(p.Auto_Task_Hours || 0);
       const subtasks = parseSubtasks(p);
+      const taskType = p.Friday_Outcome === "EVENT" ? "EVENT" : "DELIVERABLE";
 
       if (!existing) {
         groupedMap.set(key, {
@@ -512,6 +550,7 @@ export default function App() {
           title: p.Monday_Commitment,
           projectId: p.Project_ID,
           tag: p.Task_Code || "#General",
+          taskType: taskType,
           createdDate: normalizeDateStr(p.Created_Date || p.Week_Start_Date) || todayStr,
           targetDeadline: normalizeDateStr(p.Target_Deadline),
           completedDate: normalizeDateStr(p.Completed_Date),
@@ -568,55 +607,70 @@ export default function App() {
     };
   }, [companyMasterTasks, companyFilterMember, todayStr, employees]);
 
-  // Monthly Review Data
-  const reviewMetrics = useMemo(() => {
-    const currentMonthPrefix = todayStr.slice(0, 7);
-    const periodLogs = empDailyLogs.filter(l => {
-      const d = normalizeDateStr(l.Date);
-      return reviewPeriod === "WEEK" ? d >= currentMondayStr : d.startsWith(currentMonthPrefix);
+  // ================= DATE-WISE WEEKLY TIMESHEET MATRIX COMPUTATION =================
+  // Matrix for Personal Review & Company View
+  const computeTimesheetMatrix = (logsSubset, tasksSubset) => {
+    const matrixRows = [];
+
+    tasksSubset.forEach(task => {
+      const taskTitle = task.Monday_Commitment || task.title;
+      const taskPrj = task.Project_ID || task.projectId;
+      const taskTag = task.Task_Code || task.tag || "#General";
+      const isEvent = task.Friday_Outcome === "EVENT" || task.taskType === "EVENT";
+
+      const dayMins = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0 };
+      let rowTotalMins = 0;
+
+      weekDays.forEach(day => {
+        const matches = logsSubset.filter(l => {
+          const lDate = normalizeDateStr(l.Date);
+          const isDateMatch = lDate === day.dateStr;
+          const isTaskMatch = (l.Notes || "").trim().toLowerCase() === taskTitle.trim().toLowerCase() ||
+                              (l.Project_ID === taskPrj && l.Task_Code === taskTag);
+          return isDateMatch && isTaskMatch;
+        });
+
+        matches.forEach(m => {
+          const vt = Number(m.Task_Hours || 0);
+          const vl = Number(m.Learning_Hours || 0);
+          const mins = (vt > 24 ? vt : Math.round(vt * 60)) + (vl > 24 ? vl : Math.round(vl * 60));
+          dayMins[day.label] += mins;
+          rowTotalMins += mins;
+        });
+      });
+
+      if (rowTotalMins > 0 || Number(task.Auto_Task_Hours || task.progress || 0) < 100) {
+        matrixRows.push({
+          title: taskTitle,
+          project: taskPrj,
+          tag: taskTag,
+          isEvent: isEvent,
+          dayMins,
+          totalHours: (rowTotalMins / 60).toFixed(1),
+          totalMins: rowTotalMins
+        });
+      }
     });
 
-    let projectMins = 0;
-    let learningMins = 0;
-    const byTag = {};
+    return matrixRows;
+  };
 
-    periodLogs.forEach(l => {
-      const rt = Number(l.Task_Hours || 0);
-      const tMins = rt > 24 ? rt : Math.round(rt * 60);
-      const rl = Number(l.Learning_Hours || 0);
-      const lMins = rl > 24 ? rl : Math.round(rl * 60);
+  const personalTimesheetMatrix = useMemo(() => {
+    const currentWeekLogs = empDailyLogs.filter(l => normalizeDateStr(l.Date) >= currentMondayStr);
+    return computeTimesheetMatrix(currentWeekLogs, empAllPulses);
+  }, [empDailyLogs, currentMondayStr, empAllPulses, weekDays]);
 
-      projectMins += tMins;
-      learningMins += lMins;
-
-      const tagKey = l.Task_Code || "#General";
-      if (tMins > 0) byTag[tagKey] = (byTag[tagKey] || 0) + tMins;
-      if (lMins > 0) byTag["#Learning"] = (byTag["#Learning"] || 0) + lMins;
+  const companyTimesheetMatrix = useMemo(() => {
+    const subsetLogs = dailyLogs.filter(l => {
+      if (normalizeDateStr(l.Date) < currentMondayStr) return false;
+      if (companyFilterMember !== "ALL" && (l.Emp_Email || "").toLowerCase() !== companyFilterMember.toLowerCase()) return false;
+      return true;
     });
 
-    const totalMins = projectMins + learningMins;
-    const tagBars = Object.entries(byTag).map(([tag, mins]) => ({
-      tag,
-      hours: (mins / 60).toFixed(1),
-      percent: totalMins > 0 ? Math.round((mins / totalMins) * 100) : 0
-    })).sort((a, b) => Number(b.hours) - Number(a.hours));
+    return computeTimesheetMatrix(subsetLogs, companyMasterTasks);
+  }, [dailyLogs, currentMondayStr, companyFilterMember, companyMasterTasks, weekDays]);
 
-    const totalGoals = empAllPulses.filter(p => p.Project_ID !== "UPSKILLING").length;
-    const completedGoals = completedTasks.length;
-    const goalCompletionRate = totalGoals > 0 ? Math.round((completedGoals / totalGoals) * 100) : 0;
-
-    return {
-      totalHours: (totalMins / 60).toFixed(1),
-      projectHours: (projectMins / 60).toFixed(1),
-      learningHours: (learningMins / 60).toFixed(1),
-      totalGoals,
-      completedGoals,
-      goalCompletionRate,
-      tagBars
-    };
-  }, [empDailyLogs, reviewPeriod, currentMondayStr, todayStr, empAllPulses, completedTasks]);
-
-  // Subtask Sync & Auto-Progress
+  // Subtask Sync
   const syncSubtasksAndProgress = (rowItem, updatedSubtasks) => {
     const totalSub = updatedSubtasks.length;
     const doneSub = updatedSubtasks.filter(s => s.done).length;
@@ -682,7 +736,7 @@ export default function App() {
     syncSubtasksAndProgress(rowItem, updated);
   };
 
-  // 1-Tap Time Logging
+  // 1-Tap Time Logging with Date-Wise Stamping
   const handleQuickLogTimeOnRow = (rowItem, addMinutes, forceDone = false) => {
     const isLearning = rowItem.Project_ID === "UPSKILLING";
     const currentMins = Number(rowItem.Auto_Learning_Hours || 0) + addMinutes;
@@ -736,7 +790,7 @@ export default function App() {
       }]);
     }
 
-    showToast(forceDone ? `✓ Completed "${rowItem.Monday_Commitment}"!` : `🕒 Added +${addMinutes}m to "${rowItem.Monday_Commitment}"`);
+    showToast(forceDone ? `✓ Completed "${rowItem.Monday_Commitment}"!` : `🕒 Logged +${addMinutes}m today (${todayStr})`);
 
     try {
       fetch(APPS_SCRIPT_URL, {
@@ -748,6 +802,7 @@ export default function App() {
           projectId: rowItem.Project_ID,
           taskTag: rowItem.Task_Code || (isLearning ? "#Learning" : "#General"),
           taskMinutes: addMinutes,
+          logDate: todayStr,
           progressPercent: newProg,
           subtasksJson: jsonStr,
           currentStreak: currentStreak || 1,
@@ -767,7 +822,6 @@ export default function App() {
 
   const handleUpdateRowAttribute = (pulseId, field, value) => {
     setWeeklyPulses(prev => prev.map(p => p.Pulse_ID === pulseId ? { ...p, [field]: value } : p));
-    setEditingCell(null);
     showToast("Updated!");
 
     try {
@@ -782,7 +836,7 @@ export default function App() {
     } catch (err) {}
   };
 
-  // Create Standard Task
+  // Create Task or Field Event Row
   const handleCreateTaskRow = (e) => {
     e.preventDefault();
     if (!quickTitle.trim()) return;
@@ -806,7 +860,7 @@ export default function App() {
       Monday_Commitment: quickTitle.trim(),
       Auto_Task_Hours: 0,
       Auto_Learning_Hours: 0,
-      Friday_Outcome: "Self",
+      Friday_Outcome: taskCreationMode,
       Status: "In Progress",
       Target_Deadline: quickDeadline || todayStr,
       Completed_Date: "",
@@ -823,7 +877,7 @@ export default function App() {
     setQuickTitle("");
     setQuickSubtasksText("");
     setShowCollabPicker(false);
-    showToast(`Added "${quickTitle.trim()}"!`);
+    showToast(`Added ${taskCreationMode === "EVENT" ? "Field Event" : "Task"}: "${quickTitle.trim()}"!`);
 
     try {
       fetch(APPS_SCRIPT_URL, {
@@ -847,7 +901,7 @@ export default function App() {
       Monday_Commitment: newLearningTopic.trim(),
       Auto_Task_Hours: 0,
       Auto_Learning_Hours: 0,
-      Friday_Outcome: "Self",
+      Friday_Outcome: "LEARNING",
       Status: "In Progress",
       Target_Deadline: todayStr,
       Completed_Date: "",
@@ -868,7 +922,7 @@ export default function App() {
     } catch (err) {}
   };
 
-  // Library Manager Add Tag
+  // Tag Management
   const handleAddNewTag = () => {
     let t = newTagInput.trim();
     if (!t) return;
@@ -907,7 +961,7 @@ export default function App() {
   const handleAddNewProject = () => {
     if (!newPrjCode.trim() || !newPrjName.trim()) return;
     const code = newPrjCode.toUpperCase().trim();
-    if (projects.some(p => p.Project_ID === code)) {
+    if (projects.some(p => p && p.Project_ID === code)) {
       showToast("Project code exists!");
       return;
     }
@@ -928,7 +982,7 @@ export default function App() {
 
   const handleDeleteProject = (prjId) => {
     if (projects.length <= 1) return;
-    const updated = projects.filter(p => p.Project_ID !== prjId);
+    const updated = projects.filter(p => p && p.Project_ID !== prjId);
     setProjects(updated);
     showToast(`Deleted project ${prjId}`);
 
@@ -936,6 +990,39 @@ export default function App() {
       fetch(APPS_SCRIPT_URL, {
         method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
         body: JSON.stringify({ action: "deleteProject", projectId: prjId })
+      });
+    } catch (err) {}
+  };
+
+  // Safe Add Employee Submit (Eliminates Blank Screen Glitch)
+  const handleAddEmployeeSubmit = (e) => {
+    e.preventDefault();
+    const cleanEmail = (newEmp.email || "").toLowerCase().trim();
+    if (!cleanEmail) {
+      showToast("Email address is required.");
+      return;
+    }
+    const entry = {
+      Emp_ID: "IE-" + ("00" + (employees.length + 1)).slice(-3),
+      Name: (newEmp.name || "Team Member").trim(),
+      Email: cleanEmail,
+      Role_Title: (newEmp.roleTitle || "Facilitator").trim(),
+      Department: newEmp.department || "Training & Delivery",
+      Level: newEmp.level || "L3 Advanced",
+      "R&R_Summary": newEmp.rnrSummary || "",
+      Status: "Active"
+    };
+
+    setEmployees(prev => [...prev.filter(x => x && x.Email !== cleanEmail), entry]);
+    setActiveEmployeeEmail(cleanEmail);
+    setShowEmpModal(false);
+    setNewEmp({ name: "", email: "", roleTitle: "STEM Facilitator", department: "Training & Delivery", level: "L3 Advanced", rnrSummary: "" });
+    showToast(`Onboarded ${entry.Name}!`);
+
+    try {
+      fetch(APPS_SCRIPT_URL, {
+        method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: "addEmployee", ...entry })
       });
     } catch (err) {}
   };
@@ -981,7 +1068,7 @@ export default function App() {
               <span>{currentStreak}d Streak</span>
             </button>
 
-            {/* Active User Switcher */}
+            {/* Active User Switcher (Unrestricted for Testing) */}
             {employees.length > 0 && (
               <select
                 value={activeEmployeeEmail}
@@ -989,12 +1076,12 @@ export default function App() {
                 className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border focus:outline-none ${isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-slate-200 text-slate-800"}`}
               >
                 {employees.map(emp => (
-                  <option key={emp.Email} value={emp.Email}>{emp.Name}</option>
+                  <option key={emp.Email} value={emp.Email}>{emp.Name || emp.Email}</option>
                 ))}
               </select>
             )}
 
-            {/* Manage Tags & Projects Button */}
+            {/* Manage Tags & Projects */}
             <button
               type="button"
               onClick={() => setShowLibraryManager(true)}
@@ -1005,6 +1092,7 @@ export default function App() {
               <span className="hidden sm:inline">Tags & Projects</span>
             </button>
 
+            {/* Safe Onboard Member Trigger */}
             <button
               type="button"
               onClick={() => setShowEmpModal(true)}
@@ -1101,11 +1189,48 @@ export default function App() {
           </div>
         </div>
 
-        {/* ================= TAB 1: MY TASKS & SUB-TASKS ================= */}
+        {/* ================= TAB 1: MY TASKS & SUB-TASKS (WITH FIELD EVENT SUPPORT) ================= */}
         {activeTab === "my_tasks" && (
           <div className="space-y-4">
-            {/* Task Entry Bar with Searchable Tag Combobox */}
+            {/* Task Entry Bar with Mode Toggle */}
             <form onSubmit={handleCreateTaskRow} className={`p-3.5 rounded-2xl border shadow-sm space-y-2.5 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+              {/* Mode Switcher: Deliverable vs Field Event */}
+              <div className="flex items-center justify-between pb-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-400">Type:</span>
+                  <div className={`flex p-0.5 rounded-lg border text-xs ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"}`}>
+                    <button
+                      type="button"
+                      onClick={() => { setTaskCreationMode("DELIVERABLE"); setQuickTag("#General"); }}
+                      className={`px-2.5 py-1 rounded-md font-semibold transition flex items-center gap-1 ${
+                        taskCreationMode === "DELIVERABLE"
+                          ? "bg-indigo-600 text-white shadow-sm"
+                          : "text-slate-400"
+                      }`}
+                    >
+                      <Briefcase className="h-3 w-3" /> Deliverable
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setTaskCreationMode("EVENT"); setQuickTag("#SchoolVisit"); }}
+                      className={`px-2.5 py-1 rounded-md font-semibold transition flex items-center gap-1 ${
+                        taskCreationMode === "EVENT"
+                          ? "bg-indigo-600 text-white shadow-sm"
+                          : "text-slate-400"
+                      }`}
+                    >
+                      <MapPin className="h-3 w-3" /> Field Event / School Visit
+                    </button>
+                  </div>
+                </div>
+
+                <span className="text-[11px] text-slate-400 hidden sm:inline">
+                  {taskCreationMode === "EVENT" 
+                    ? "📅 Blocks calendar day with 1-tap Half Day (3h) or Full Day (6h) logs"
+                    : "📋 Sub-task checklist auto-calculates progress %"}
+                </span>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                 <div className="sm:col-span-4">
                   <input
@@ -1113,7 +1238,7 @@ export default function App() {
                     required
                     value={quickTitle}
                     onChange={(e) => setQuickTitle(e.target.value)}
-                    placeholder="Deliverable (e.g. AMT School Expo Booth)"
+                    placeholder={taskCreationMode === "EVENT" ? "Event / Visit (e.g. AMT School Science Mela)" : "Deliverable (e.g. Dexter Grade 6 BOM Costing)"}
                     className={`w-full px-3 py-2 rounded-xl text-xs sm:text-sm border focus:outline-none ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-900 focus:bg-white"}`}
                   />
                 </div>
@@ -1123,7 +1248,7 @@ export default function App() {
                     type="text"
                     value={quickSubtasksText}
                     onChange={(e) => setQuickSubtasksText(e.target.value)}
-                    placeholder="Sub-tasks, comma-separated (e.g. Pack kits, Print posters)"
+                    placeholder={taskCreationMode === "EVENT" ? "Optional visit notes..." : "Sub-tasks, comma-separated (e.g. Pack kits, Print posters)"}
                     className={`w-full px-3 py-2 rounded-xl text-xs border focus:outline-none ${isDark ? "bg-slate-950 border-slate-800 text-slate-200" : "bg-slate-50 border-slate-200 text-slate-700 focus:bg-white"}`}
                   />
                 </div>
@@ -1138,7 +1263,6 @@ export default function App() {
                   </select>
                 </div>
 
-                {/* Searchable Tag Combobox (Replaced rigid dropdown) */}
                 <div className="sm:col-span-1">
                   <SearchableTagCombobox
                     value={quickTag}
@@ -1175,7 +1299,7 @@ export default function App() {
                       className="text-[11px] text-indigo-500 font-medium flex items-center gap-1 hover:underline"
                     >
                       <Users className="h-3.5 w-3.5" />
-                      <span>{selectedCollaborators.length > 1 ? `Assigned to ${selectedCollaborators.length} members` : "+ Assign Co-Owners / Collaborators"}</span>
+                      <span>{selectedCollaborators.length > 1 ? `Assigned to ${selectedCollaborators.length} members` : "+ Assign Co-Owners / Facilitators"}</span>
                     </button>
 
                     {showCollabPicker && employees.map(emp => {
@@ -1190,14 +1314,11 @@ export default function App() {
                           }}
                           className={`px-2 py-0.5 rounded-full text-[11px] border transition ${isSel ? "bg-indigo-600 text-white border-indigo-600" : isDark ? "bg-slate-950 border-slate-800 text-slate-400" : "bg-slate-100 border-slate-200 text-slate-600"}`}
                         >
-                          {emp.Name} {isSel && "✓"}
+                          {emp.Name || emp.Email} {isSel && "✓"}
                         </button>
                       );
                     })}
                   </div>
-                  <span className="text-[11px] text-slate-400 hidden md:inline">
-                    Checking sub-tasks drives progress % automatically
-                  </span>
                 </div>
               )}
             </form>
@@ -1209,20 +1330,20 @@ export default function App() {
                   <thead>
                     <tr className={`border-b text-[11px] uppercase tracking-wider font-semibold ${isDark ? "bg-slate-950/60 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
                       <th className="py-3 px-3 w-10 text-center">Done</th>
-                      <th className="py-3 px-3">Deliverable & Sub-Tasks (Click row to expand)</th>
+                      <th className="py-3 px-3">Deliverable / Field Event</th>
                       <th className="py-3 px-3 w-28">Project</th>
                       <th className="py-3 px-3 w-32">Activity Tag</th>
-                      <th className="py-3 px-3 w-28">Due Date</th>
-                      <th className="py-3 px-3 w-36">Sub-Task Progress</th>
+                      <th className="py-3 px-3 w-28">Event Date</th>
+                      <th className="py-3 px-3 w-36">Progress</th>
                       <th className="py-3 px-3 w-20 text-right">Logged</th>
-                      <th className="py-3 px-4 w-44 text-right">Log Effort</th>
+                      <th className="py-3 px-4 w-52 text-right">Log Effort</th>
                     </tr>
                   </thead>
                   <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-200/70"}`}>
                     {activeTasks.length === 0 ? (
                       <tr>
                         <td colSpan="8" className="py-10 text-center text-slate-400 text-xs">
-                          Your active sheet is clear! Add your tasks and sub-tasks above.
+                          Your active sheet is clear! Add your tasks and field events above.
                         </td>
                       </tr>
                     ) : (
@@ -1230,17 +1351,19 @@ export default function App() {
                         const mins = Number(row.Auto_Learning_Hours || 0);
                         const subtasks = parseSubtasks(row);
                         const doneSubCount = subtasks.filter(s => s.done).length;
-                        const prog = subtasks.length > 0
-                          ? Math.round((doneSubCount / subtasks.length) * 100)
-                          : Number(row.Auto_Task_Hours || 0);
+                        const isEvent = row.Friday_Outcome === "EVENT";
+                        const prog = isEvent 
+                          ? Number(row.Auto_Task_Hours || 0)
+                          : (subtasks.length > 0 ? Math.round((doneSubCount / subtasks.length) * 100) : Number(row.Auto_Task_Hours || 0));
 
                         const due = normalizeDateStr(row.Target_Deadline);
+                        const isToday = due === todayStr;
                         const isOverdue = due && due < todayStr;
                         const isExpanded = Boolean(expandedRowIds[row.Pulse_ID]);
 
                         return (
                           <React.Fragment key={row.Pulse_ID}>
-                            <tr className={`transition ${isDark ? "hover:bg-slate-800/40" : "hover:bg-slate-50/80"}`}>
+                            <tr className={`transition ${isDark ? "hover:bg-slate-800/40" : "hover:bg-slate-50/80"} ${isEvent ? (isDark ? "bg-indigo-950/15" : "bg-indigo-50/20") : ""}`}>
                               <td className="py-3 px-3 text-center">
                                 <button
                                   type="button"
@@ -1254,34 +1377,25 @@ export default function App() {
 
                               <td className="py-3 px-3 font-medium">
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <button
-                                    type="button"
-                                    onClick={() => setExpandedRowIds(prev => ({ ...prev, [row.Pulse_ID]: !isExpanded }))}
-                                    className="p-0.5 hover:text-indigo-500"
-                                  >
-                                    {isExpanded ? <ChevronDown className="h-4 w-4 text-indigo-500" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
-                                  </button>
-
-                                  {editingCell?.pulseId === row.Pulse_ID && editingCell?.field === "title" ? (
-                                    <input
-                                      autoFocus
-                                      type="text"
-                                      defaultValue={row.Monday_Commitment}
-                                      onBlur={(e) => handleUpdateRowAttribute(row.Pulse_ID, "Monday_Commitment", e.target.value)}
-                                      onKeyDown={(e) => { if (e.key === "Enter") handleUpdateRowAttribute(row.Pulse_ID, "Monday_Commitment", e.target.value); }}
-                                      className={`px-2 py-0.5 rounded border text-xs ${isDark ? "bg-slate-950 border-slate-700" : "bg-white border-slate-300"}`}
-                                    />
-                                  ) : (
-                                    <span
-                                      onClick={() => setEditingCell({ pulseId: row.Pulse_ID, field: "title" })}
-                                      className="cursor-pointer hover:underline"
-                                      title="Click to edit title"
+                                  {!isEvent && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setExpandedRowIds(prev => ({ ...prev, [row.Pulse_ID]: !isExpanded }))}
+                                      className="p-0.5 hover:text-indigo-500"
                                     >
-                                      {row.Monday_Commitment}
+                                      {isExpanded ? <ChevronDown className="h-4 w-4 text-indigo-500" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+                                    </button>
+                                  )}
+
+                                  {isEvent && (
+                                    <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-500 text-[10px] font-bold flex items-center gap-0.5">
+                                      <MapPin className="h-3 w-3" /> Visit
                                     </span>
                                   )}
 
-                                  {subtasks.length > 0 && (
+                                  <span>{row.Monday_Commitment}</span>
+
+                                  {subtasks.length > 0 && !isEvent && (
                                     <span className={`px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold ${isDark ? "bg-slate-800 text-indigo-300" : "bg-slate-100 text-indigo-700"}`}>
                                       {doneSubCount}/{subtasks.length} ☑
                                     </span>
@@ -1293,7 +1407,13 @@ export default function App() {
                                     </span>
                                   )}
 
-                                  {isOverdue && (
+                                  {isToday && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 font-semibold">
+                                      Today
+                                    </span>
+                                  )}
+
+                                  {isOverdue && !isToday && (
                                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-500 font-semibold">
                                       Overdue
                                     </span>
@@ -1311,7 +1431,6 @@ export default function App() {
                                 </select>
                               </td>
 
-                              {/* Searchable Combobox inside row cell */}
                               <td className="py-3 px-3">
                                 <SearchableTagCombobox
                                   value={row.Task_Code || "#General"}
@@ -1344,34 +1463,64 @@ export default function App() {
                                 {(mins / 60).toFixed(1)}h
                               </td>
 
+                              {/* Action Buttons: 1-Tap Field Day vs Standard Hours */}
                               <td className="py-3 px-4 text-right">
-                                <div className="inline-flex items-center gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleQuickLogTimeOnRow(row, 30, false)}
-                                    className={`px-2 py-1 rounded text-[11px] font-mono font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}
-                                  >
-                                    +30m
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleQuickLogTimeOnRow(row, 60, false)}
-                                    className={`px-2 py-1 rounded text-[11px] font-mono font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}
-                                  >
-                                    +1h
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleQuickLogTimeOnRow(row, 0, true)}
-                                    className="px-2 py-1 rounded text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition"
-                                  >
-                                    Done ✓
-                                  </button>
-                                </div>
+                                {isEvent ? (
+                                  <div className="inline-flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleQuickLogTimeOnRow(row, 180, false)}
+                                      title="Log 3 Hours (Half Day School Visit)"
+                                      className={`px-2 py-1 rounded text-[11px] font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}
+                                    >
+                                      Half (3h)
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleQuickLogTimeOnRow(row, 360, false)}
+                                      title="Log 6 Hours (Full Day School Visit)"
+                                      className={`px-2 py-1 rounded text-[11px] font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}
+                                    >
+                                      Full (6h)
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleQuickLogTimeOnRow(row, 0, true)}
+                                      className="px-2 py-1 rounded text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition"
+                                    >
+                                      Done ✓
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="inline-flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleQuickLogTimeOnRow(row, 30, false)}
+                                      className={`px-2 py-1 rounded text-[11px] font-mono font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}
+                                    >
+                                      +30m
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleQuickLogTimeOnRow(row, 60, false)}
+                                      className={`px-2 py-1 rounded text-[11px] font-mono font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}
+                                    >
+                                      +1h
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleQuickLogTimeOnRow(row, 0, true)}
+                                      className="px-2 py-1 rounded text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition"
+                                    >
+                                      Done ✓
+                                    </button>
+                                  </div>
+                                )}
                               </td>
                             </tr>
 
-                            {isExpanded && (
+                            {/* Expanded Subtasks */}
+                            {isExpanded && !isEvent && (
                               <tr className={isDark ? "bg-slate-950/70" : "bg-indigo-50/30"}>
                                 <td></td>
                                 <td colSpan="7" className="py-3 px-4">
@@ -1456,7 +1605,7 @@ export default function App() {
                     className="font-semibold text-slate-500 hover:text-indigo-500 flex items-center gap-1.5"
                   >
                     <CheckSquare className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>{showCompletedRows ? "Hide" : "Show"} Completed Tasks ({completedTasks.length})</span>
+                    <span>{showCompletedRows ? "Hide" : "Show"} Completed Deliverables ({completedTasks.length})</span>
                   </button>
 
                   {showCompletedRows && (
@@ -1477,7 +1626,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= TAB 2: LEARNING LOG (WITH COMBOBOX) ================= */}
+        {/* ================= TAB 2: LEARNING LOG ================= */}
         {activeTab === "learning" && (
           <div className="space-y-4">
             <form onSubmit={handleCreateLearningItem} className={`p-3.5 rounded-2xl border shadow-sm space-y-2 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
@@ -1618,13 +1767,13 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= TAB 3: MONTHLY & GOAL REVIEW ================= */}
+        {/* ================= TAB 3: MONTHLY & GOAL REVIEW (INCLUDES DATE-WISE MATRIX) ================= */}
         {activeTab === "monthly_review" && (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold">Personal Monthly & Goal Review</h2>
-                <p className="text-xs text-slate-400">Reflecting on effort, tags & baseline KRAs for {currentEmp.Name}</p>
+                <p className="text-xs text-slate-400">Day-by-day effort & KRAs for {currentEmp.Name}</p>
               </div>
               <div className={`flex p-1 rounded-xl border text-xs ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
                 <button
@@ -1644,6 +1793,73 @@ export default function App() {
               </div>
             </div>
 
+            {/* 1. DATE-WISE WEEKLY TIMESHEET MATRIX (Monday to Saturday Split!) */}
+            <div className={`p-5 rounded-2xl border shadow-sm space-y-3 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-indigo-500" />
+                  <h3 className="font-bold text-sm">My Weekly Effort Matrix ({currentMondayStr} – Sat)</h3>
+                </div>
+                <span className="text-xs text-indigo-500 font-mono font-bold">
+                  Total: {personalTimesheetMatrix.reduce((a, b) => a + Number(b.totalHours), 0).toFixed(1)} hrs
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className={`border-b text-[11px] uppercase font-semibold ${isDark ? "bg-slate-950/60 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
+                      <th className="py-2.5 px-3">Deliverable / Visit</th>
+                      <th className="py-2.5 px-2">Tag</th>
+                      {weekDays.map(d => (
+                        <th key={d.label} className={`py-2.5 px-2 text-center w-14 ${d.dateStr === todayStr ? "text-indigo-500 font-bold" : ""}`}>
+                          {d.label}
+                        </th>
+                      ))}
+                      <th className="py-2.5 px-3 text-right w-16">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-200/60"}`}>
+                    {personalTimesheetMatrix.length === 0 ? (
+                      <tr>
+                        <td colSpan="9" className="py-6 text-center text-slate-400 italic">
+                          No hours logged yet this week. Use the buttons on your tasks or learning sheet to log effort!
+                        </td>
+                      </tr>
+                    ) : (
+                      personalTimesheetMatrix.map((row, idx) => (
+                        <tr key={idx} className={`transition ${isDark ? "hover:bg-slate-800/40" : "hover:bg-slate-50/80"}`}>
+                          <td className="py-2.5 px-3 font-medium">
+                            <div className="flex items-center gap-1.5">
+                              {row.isEvent && <MapPin className="h-3 w-3 text-indigo-500 shrink-0" />}
+                              <span>{row.title}</span>
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-2">
+                            <span className="px-1.5 py-0.5 rounded bg-slate-500/10 text-[10px] font-medium">
+                              {row.tag}
+                            </span>
+                          </td>
+                          {weekDays.map(d => {
+                            const mins = row.dayMins[d.label] || 0;
+                            return (
+                              <td key={d.label} className={`py-2.5 px-2 text-center font-mono ${mins > 0 ? "font-bold text-indigo-400" : "text-slate-500"}`}>
+                                {mins > 0 ? `${(mins / 60).toFixed(1)}h` : "-"}
+                              </td>
+                            );
+                          })}
+                          <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-500">
+                            {row.totalHours}h
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* KPI Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
               <div className={`p-4 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
                 <span className="text-xs text-slate-400 block">Personal Goal Completion</span>
@@ -1672,7 +1888,7 @@ export default function App() {
 
             {/* Time by Tag Breakdown */}
             <div className={`p-5 rounded-2xl border space-y-3 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
-              <h3 className="font-bold text-sm">Where My Time Went by Activity Tag ({reviewPeriod === "WEEK" ? "This Week" : "This Month"})</h3>
+              <h3 className="font-bold text-sm">Where My Time Went by Activity Tag</h3>
               {reviewMetrics.tagBars.length === 0 ? (
                 <p className="text-xs text-slate-400 py-4">No hours logged yet in this period.</p>
               ) : (
@@ -1706,7 +1922,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      setEmployees(prev => prev.map(e => (e.Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase() ? { ...e, "R&R_Summary": rnrDraft } : e));
+                      setEmployees(prev => prev.map(e => e && (e.Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase() ? { ...e, "R&R_Summary": rnrDraft } : e));
                       setIsEditingRnR(false);
                       showToast("Saved KRAs!");
                       try {
@@ -1731,7 +1947,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= TAB 4: COMPANY MASTER VIEW ================= */}
+        {/* ================= TAB 4: COMPANY MASTER VIEW (WITH DUAL ROADMAP & TIMESHEET MODES) ================= */}
         {activeTab === "company_master" && (
           <div className="space-y-5">
             {/* WEEKLY LAUNCH TOWER WIDGET */}
@@ -1805,18 +2021,33 @@ export default function App() {
               </div>
             </div>
 
-            {/* Filters */}
-            <div className={`p-3 rounded-2xl border flex flex-wrap items-center justify-between gap-2 text-xs ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
+            {/* View Mode Toggle: Deliverables vs Weekly Timesheet Grid */}
+            <div className={`p-3 rounded-2xl border flex flex-wrap items-center justify-between gap-3 text-xs ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
               <div className="flex items-center gap-2 flex-wrap">
-                <Filter className="h-3.5 w-3.5 text-indigo-500" />
-                <select
-                  value={companyFilterProject}
-                  onChange={(e) => setCompanyFilterProject(e.target.value)}
-                  className={`px-2.5 py-1.5 rounded-lg border font-medium ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"}`}
-                >
-                  <option value="ALL">All Projects</option>
-                  {projects.map(p => <option key={p.Project_ID} value={p.Project_ID}>{p.Project_Name}</option>)}
-                </select>
+                <div className={`flex p-0.5 rounded-lg border ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"}`}>
+                  <button
+                    type="button"
+                    onClick={() => setCompanyMasterMode("ROADMAP")}
+                    className={`px-3 py-1.5 rounded-md font-semibold transition flex items-center gap-1.5 ${
+                      companyMasterMode === "ROADMAP"
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : "text-slate-400"
+                    }`}
+                  >
+                    <ListChecks className="h-3.5 w-3.5" /> Deliverables List
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCompanyMasterMode("TIMESHEET")}
+                    className={`px-3 py-1.5 rounded-md font-semibold transition flex items-center gap-1.5 ${
+                      companyMasterMode === "TIMESHEET"
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : "text-slate-400"
+                    }`}
+                  >
+                    <Calendar className="h-3.5 w-3.5" /> Weekly Day-by-Day Matrix
+                  </button>
+                </div>
 
                 <select
                   value={companyFilterMember}
@@ -1824,170 +2055,282 @@ export default function App() {
                   className={`px-2.5 py-1.5 rounded-lg border font-medium ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"}`}
                 >
                   <option value="ALL">All Team Members (Company View)</option>
-                  {employees.map(emp => <option key={emp.Email} value={emp.Email}>{emp.Name}</option>)}
+                  {employees.map(emp => <option key={emp.Email} value={emp.Email}>{emp.Name || emp.Email}</option>)}
                 </select>
 
-                <div className={`flex p-0.5 rounded-lg border ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"}`}>
-                  {[
-                    { id: "ALL", label: "All" },
-                    { id: "ACTIVE", label: "Active" },
-                    { id: "DONE", label: "Done" },
-                    { id: "OVERDUE", label: "Overdue" }
-                  ].map(st => (
-                    <button
-                      key={st.id}
-                      type="button"
-                      onClick={() => setCompanyFilterStatus(st.id)}
-                      className={`px-2.5 py-1 rounded-md font-semibold transition ${
-                        companyFilterStatus === st.id
-                          ? (isDark ? "bg-slate-800 text-white" : "bg-white text-slate-900 shadow-sm")
-                          : "text-slate-400"
-                      }`}
-                    >
-                      {st.label}
-                    </button>
-                  ))}
-                </div>
+                {companyMasterMode === "ROADMAP" && (
+                  <select
+                    value={companyFilterProject}
+                    onChange={(e) => setCompanyFilterProject(e.target.value)}
+                    className={`px-2.5 py-1.5 rounded-lg border font-medium ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"}`}
+                  >
+                    <option value="ALL">All Projects</option>
+                    {projects.map(p => <option key={p.Project_ID} value={p.Project_ID}>{p.Project_Name}</option>)}
+                  </select>
+                )}
               </div>
 
               <span className="text-slate-400">
-                Click any row to inspect sub-tasks
+                {companyMasterMode === "TIMESHEET" ? "Mon–Sat date-wise hours logged per deliverable" : "Click any row to inspect sub-tasks"}
               </span>
             </div>
 
-            {/* Master Roadmap Table */}
-            <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs sm:text-sm">
-                  <thead>
-                    <tr className={`border-b text-[11px] uppercase font-semibold ${isDark ? "bg-slate-950/60 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
-                      <th className="py-3 px-4">Deliverable</th>
-                      <th className="py-3 px-3">Project</th>
-                      <th className="py-3 px-3">Tag</th>
-                      <th className="py-3 px-3">Owner(s)</th>
-                      <th className="py-3 px-3">Due Date</th>
-                      <th className="py-3 px-3">Sub-Tasks</th>
-                      <th className="py-3 px-3 w-36">Progress</th>
-                      <th className="py-3 px-4 text-right">Combined Effort</th>
-                    </tr>
-                  </thead>
-                  <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-200/70"}`}>
-                    {filteredCompanyTasks.length === 0 ? (
-                      <tr>
-                        <td colSpan="8" className="py-8 text-center text-slate-400 text-xs">
-                          No deliverables found matching the filter.
-                        </td>
+            {/* VIEW 1: ROADMAP TABLE */}
+            {companyMasterMode === "ROADMAP" && (
+              <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                    <thead>
+                      <tr className={`border-b text-[11px] uppercase font-semibold ${isDark ? "bg-slate-950/60 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
+                        <th className="py-3 px-4">Deliverable / Visit</th>
+                        <th className="py-3 px-3">Project</th>
+                        <th className="py-3 px-3">Tag</th>
+                        <th className="py-3 px-3">Owner(s)</th>
+                        <th className="py-3 px-3">Target Date</th>
+                        <th className="py-3 px-3">Sub-Tasks</th>
+                        <th className="py-3 px-3 w-36">Progress</th>
+                        <th className="py-3 px-4 text-right">Combined Effort</th>
                       </tr>
-                    ) : (
-                      filteredCompanyTasks.map(item => {
-                        const isDone = item.progress >= 100;
-                        const isOverdue = !isDone && item.targetDeadline && item.targetDeadline < todayStr;
-                        const doneSub = item.subtasks.filter(s => s.done).length;
-                        const isExp = Boolean(expandedMasterKeys[item.groupKey]);
+                    </thead>
+                    <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-200/70"}`}>
+                      {filteredCompanyTasks.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" className="py-8 text-center text-slate-400 text-xs">
+                            No deliverables found matching the filter.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredCompanyTasks.map(item => {
+                          const isDone = item.progress >= 100;
+                          const isOverdue = !isDone && item.targetDeadline && item.targetDeadline < todayStr;
+                          const doneSub = item.subtasks.filter(s => s.done).length;
+                          const isExp = Boolean(expandedMasterKeys[item.groupKey]);
+                          const isEvent = item.taskType === "EVENT";
 
-                        return (
-                          <React.Fragment key={item.groupKey}>
-                            <tr
-                              onClick={() => setExpandedMasterKeys(prev => ({ ...prev, [item.groupKey]: !isExp }))}
-                              className={`cursor-pointer transition ${isDark ? "hover:bg-slate-800/40" : "hover:bg-slate-50/80"}`}
-                            >
-                              <td className="py-3 px-4 font-medium">
-                                <div className="flex items-center gap-1.5">
-                                  {isExp ? <ChevronDown className="h-4 w-4 text-indigo-500" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
-                                  <span className={isDone ? "line-through text-slate-400" : ""}>{item.title}</span>
-                                  {isOverdue && (
-                                    <span className="px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-500 text-[10px] font-semibold">
-                                      Overdue
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-
-                              <td className="py-3 px-3">
-                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? "bg-indigo-500/10 text-indigo-300" : "bg-indigo-50 text-indigo-700"}`}>
-                                  {getProjectLabel(item.projectId)}
-                                </span>
-                              </td>
-
-                              <td className="py-3 px-3">
-                                <span className="px-1.5 py-0.5 rounded bg-slate-500/10 text-[11px] font-medium">
-                                  {item.tag}
-                                </span>
-                              </td>
-
-                              <td className="py-3 px-3 text-xs">
-                                {item.owners.map(getEmployeeName).join(", ")}
-                              </td>
-
-                              <td className="py-3 px-3 font-mono text-xs text-slate-400">
-                                {item.targetDeadline || "Rolling"}
-                              </td>
-
-                              <td className="py-3 px-3 font-mono text-xs">
-                                {item.subtasks.length > 0 ? (
-                                  <span className="px-2 py-0.5 rounded bg-slate-500/10 font-semibold">
-                                    {doneSub} / {item.subtasks.length} ☑
-                                  </span>
-                                ) : (
-                                  <span className="text-slate-400">1-step</span>
-                                )}
-                              </td>
-
-                              <td className="py-3 px-3">
-                                <div className="flex items-center gap-2">
-                                  <div className={`w-16 h-2 rounded-full overflow-hidden ${isDark ? "bg-slate-800" : "bg-slate-200"}`}>
-                                    <div
-                                      className={`h-full ${isDone ? "bg-emerald-500" : "bg-indigo-600"}`}
-                                      style={{ width: `${item.progress}%` }}
-                                    />
+                          return (
+                            <React.Fragment key={item.groupKey}>
+                              <tr
+                                onClick={() => setExpandedMasterKeys(prev => ({ ...prev, [item.groupKey]: !isExp }))}
+                                className={`cursor-pointer transition ${isDark ? "hover:bg-slate-800/40" : "hover:bg-slate-50/80"}`}
+                              >
+                                <td className="py-3 px-4 font-medium">
+                                  <div className="flex items-center gap-1.5">
+                                    {isExp ? <ChevronDown className="h-4 w-4 text-indigo-500" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+                                    {isEvent && (
+                                      <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-500 text-[10px] font-bold flex items-center gap-0.5">
+                                        <MapPin className="h-3 w-3" /> Visit
+                                      </span>
+                                    )}
+                                    <span className={isDone ? "line-through text-slate-400" : ""}>{item.title}</span>
+                                    {isOverdue && (
+                                      <span className="px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-500 text-[10px] font-semibold">
+                                        Overdue
+                                      </span>
+                                    )}
                                   </div>
-                                  <span className={`font-mono text-xs font-bold ${isDone ? "text-emerald-500" : "text-indigo-500"}`}>
-                                    {item.progress}%
+                                </td>
+
+                                <td className="py-3 px-3">
+                                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? "bg-indigo-500/10 text-indigo-300" : "bg-indigo-50 text-indigo-700"}`}>
+                                    {getProjectLabel(item.projectId)}
                                   </span>
-                                </div>
-                              </td>
+                                </td>
 
-                              <td className="py-3 px-4 text-right font-mono text-xs font-semibold">
-                                {(item.totalMinutes / 60).toFixed(1)}h
-                              </td>
-                            </tr>
+                                <td className="py-3 px-3">
+                                  <span className="px-1.5 py-0.5 rounded bg-slate-500/10 text-[11px] font-medium">
+                                    {item.tag}
+                                  </span>
+                                </td>
 
-                            {isExp && (
-                              <tr className={isDark ? "bg-slate-950/70" : "bg-slate-50"}>
-                                <td colSpan="8" className="py-3 px-8">
-                                  {item.subtasks.length === 0 ? (
-                                    <p className="text-xs text-slate-400 italic">No sub-tasks defined for this deliverable.</p>
+                                <td className="py-3 px-3 text-xs">
+                                  {item.owners.map(getEmployeeName).join(", ")}
+                                </td>
+
+                                <td className="py-3 px-3 font-mono text-xs text-slate-400">
+                                  {item.targetDeadline || "Rolling"}
+                                </td>
+
+                                <td className="py-3 px-3 font-mono text-xs">
+                                  {item.subtasks.length > 0 ? (
+                                    <span className="px-2 py-0.5 rounded bg-slate-500/10 font-semibold">
+                                      {doneSub} / {item.subtasks.length} ☑
+                                    </span>
                                   ) : (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                                      {item.subtasks.map((sub, idx) => (
-                                        <div
-                                          key={sub.id}
-                                          className={`px-3 py-1.5 rounded-lg border text-xs flex items-center gap-2 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}
-                                        >
-                                          <span className={sub.done ? "text-emerald-500 font-bold" : "text-slate-400"}>
-                                            {sub.done ? "☑" : "☐"}
-                                          </span>
-                                          <span className={sub.done ? "line-through text-slate-400" : ""}>
-                                            {idx + 1}. {sub.title}
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
+                                    <span className="text-slate-400">{isEvent ? "Full/Half Day" : "1-step"}</span>
                                   )}
                                 </td>
+
+                                <td className="py-3 px-3">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-16 h-2 rounded-full overflow-hidden ${isDark ? "bg-slate-800" : "bg-slate-200"}`}>
+                                      <div
+                                        className={`h-full ${isDone ? "bg-emerald-500" : "bg-indigo-600"}`}
+                                        style={{ width: `${item.progress}%` }}
+                                      />
+                                    </div>
+                                    <span className={`font-mono text-xs font-bold ${isDone ? "text-emerald-500" : "text-indigo-500"}`}>
+                                      {item.progress}%
+                                    </span>
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-4 text-right font-mono text-xs font-semibold">
+                                  {(item.totalMinutes / 60).toFixed(1)}h
+                                </td>
                               </tr>
-                            )}
-                          </React.Fragment>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+
+                              {isExp && (
+                                <tr className={isDark ? "bg-slate-950/70" : "bg-slate-50"}>
+                                  <td colSpan="8" className="py-3 px-8">
+                                    {item.subtasks.length === 0 ? (
+                                      <p className="text-xs text-slate-400 italic">No sub-tasks defined for this deliverable.</p>
+                                    ) : (
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                        {item.subtasks.map((sub, idx) => (
+                                          <div
+                                            key={sub.id}
+                                            className={`px-3 py-1.5 rounded-lg border text-xs flex items-center gap-2 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}
+                                          >
+                                            <span className={sub.done ? "text-emerald-500 font-bold" : "text-slate-400"}>
+                                              {sub.done ? "☑" : "☐"}
+                                            </span>
+                                            <span className={sub.done ? "line-through text-slate-400" : ""}>
+                                              {idx + 1}. {sub.title}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* VIEW 2: WEEKLY DAY-BY-DAY MATRIX TABLE */}
+            {companyMasterMode === "TIMESHEET" && (
+              <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                    <thead>
+                      <tr className={`border-b text-[11px] uppercase font-semibold ${isDark ? "bg-slate-950/60 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
+                        <th className="py-3 px-4">Deliverable / Field Event</th>
+                        <th className="py-3 px-3">Project</th>
+                        <th className="py-3 px-3">Tag</th>
+                        {weekDays.map(d => (
+                          <th key={d.label} className={`py-3 px-2 text-center w-16 ${d.dateStr === todayStr ? "text-indigo-500 font-bold" : ""}`}>
+                            {d.label} <span className="text-[10px] opacity-60 block">{d.dateStr.slice(8)}</span>
+                          </th>
+                        ))}
+                        <th className="py-3 px-4 text-right w-20">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-200/70"}`}>
+                      {companyTimesheetMatrix.length === 0 ? (
+                        <tr>
+                          <td colSpan="10" className="py-8 text-center text-slate-400 text-xs">
+                            No team hours logged yet for this week ({currentMondayStr} onwards).
+                          </td>
+                        </tr>
+                      ) : (
+                        companyTimesheetMatrix.map((row, idx) => (
+                          <tr key={idx} className={`transition ${isDark ? "hover:bg-slate-800/40" : "hover:bg-slate-50/80"}`}>
+                            <td className="py-3 px-4 font-medium">
+                              <div className="flex items-center gap-1.5">
+                                {row.isEvent && <MapPin className="h-3.5 w-3.5 text-indigo-500 shrink-0" />}
+                                <span>{row.title}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? "bg-indigo-500/10 text-indigo-300" : "bg-indigo-50 text-indigo-700"}`}>
+                                {getProjectLabel(row.project)}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className="px-1.5 py-0.5 rounded bg-slate-500/10 text-[11px] font-medium">
+                                {row.tag}
+                              </span>
+                            </td>
+                            {weekDays.map(d => {
+                              const mins = row.dayMins[d.label] || 0;
+                              return (
+                                <td key={d.label} className={`py-3 px-2 text-center font-mono ${mins > 0 ? "font-bold text-indigo-400" : "text-slate-500"}`}>
+                                  {mins > 0 ? `${(mins / 60).toFixed(1)}h` : "-"}
+                                </td>
+                              );
+                            })}
+                            <td className="py-3 px-4 text-right font-mono font-bold text-emerald-500">
+                              {row.totalHours}h
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
+
+      {/* ================= SAFE ONBOARD MEMBER MODAL (GLITCH FIXED) ================= */}
+      {showEmpModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`border rounded-2xl max-w-md w-full p-5 shadow-xl space-y-3 text-xs ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-bold flex items-center gap-1.5">
+                <UserPlus className="h-4 w-4 text-indigo-500" /> Onboard Team Member
+              </h3>
+              <button type="button" onClick={() => setShowEmpModal(false)}><X className="h-4 w-4" /></button>
+            </div>
+            <form onSubmit={handleAddEmployeeSubmit} className="space-y-3">
+              <input 
+                required 
+                type="text" 
+                value={newEmp.name} 
+                onChange={e => setNewEmp({...newEmp, name: e.target.value})} 
+                className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} 
+                placeholder="Full Name (e.g. Durga Devi)" 
+              />
+              <input 
+                required 
+                type="email" 
+                value={newEmp.email} 
+                onChange={e => setNewEmp({...newEmp, email: e.target.value})} 
+                className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} 
+                placeholder="Work Email (e.g. durga@infiniteengineers.in)" 
+              />
+              <input 
+                required 
+                type="text" 
+                value={newEmp.roleTitle} 
+                onChange={e => setNewEmp({...newEmp, roleTitle: e.target.value})} 
+                className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} 
+                placeholder="Role Title (e.g. Lead STEM Facilitator)" 
+              />
+              <textarea 
+                rows="3" 
+                value={newEmp.rnrSummary} 
+                onChange={e => setNewEmp({...newEmp, rnrSummary: e.target.value})} 
+                className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} 
+                placeholder="Core Responsibilities / Monthly KRAs..." 
+              />
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setShowEmpModal(false)} className="px-3 py-2 text-slate-400">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl">Save Member</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ================= TAGS & PROJECTS MANAGER DRAWER ================= */}
       {showLibraryManager && (
@@ -2001,7 +2344,7 @@ export default function App() {
               <button type="button" onClick={() => setShowLibraryManager(false)}><X className="h-4 w-4 text-slate-400" /></button>
             </div>
 
-            {/* 1. TAGS SECTION */}
+            {/* Tags Library */}
             <div className="space-y-2.5">
               <h4 className="font-bold text-xs uppercase text-indigo-500 flex items-center gap-1.5">
                 <Tag className="h-3.5 w-3.5" /> Activity Tags Library ({tags.length})
@@ -2044,7 +2387,7 @@ export default function App() {
 
             <hr className={isDark ? "border-slate-800" : "border-slate-200"} />
 
-            {/* 2. PROJECTS SECTION */}
+            {/* Projects Library */}
             <div className="space-y-2.5">
               <h4 className="font-bold text-xs uppercase text-indigo-500 flex items-center gap-1.5">
                 <FolderPlus className="h-3.5 w-3.5" /> Operational Projects ({projects.length})
@@ -2252,41 +2595,6 @@ export default function App() {
                 Close
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ================= ONBOARD MEMBER MODAL ================= */}
-      {showEmpModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className={`border rounded-2xl max-w-md w-full p-5 shadow-xl space-y-3 text-xs ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
-            <div className="flex justify-between items-center">
-              <h3 className="text-sm font-bold">Onboard Team Member</h3>
-              <button type="button" onClick={() => setShowEmpModal(false)}><X className="h-4 w-4" /></button>
-            </div>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const entry = { Emp_ID: "IE-" + ("00" + (employees.length + 1)).slice(-3), Name: newEmp.name, Email: newEmp.email.toLowerCase().trim(), Role_Title: newEmp.roleTitle, Department: newEmp.department, Level: newEmp.level, "R&R_Summary": newEmp.rnrSummary, Status: "Active" };
-              setEmployees(prev => [...prev, entry]);
-              setActiveEmployeeEmail(entry.Email);
-              setShowEmpModal(false);
-              showToast(`Added ${entry.Name}!`);
-              try {
-                fetch(APPS_SCRIPT_URL, {
-                  method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-                  body: JSON.stringify({ action: "addEmployee", ...newEmp })
-                });
-              } catch (err) {}
-            }} className="space-y-3">
-              <input required type="text" value={newEmp.name} onChange={e => setNewEmp({...newEmp, name: e.target.value})} className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} placeholder="Full Name" />
-              <input required type="email" value={newEmp.email} onChange={e => setNewEmp({...newEmp, email: e.target.value})} className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} placeholder="Email Address" />
-              <input required type="text" value={newEmp.roleTitle} onChange={e => setNewEmp({...newEmp, roleTitle: e.target.value})} className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} placeholder="Role Title" />
-              <textarea rows="3" required value={newEmp.rnrSummary} onChange={e => setNewEmp({...newEmp, rnrSummary: e.target.value})} className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} placeholder="Core Responsibilities / Monthly Goals..." />
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setShowEmpModal(false)} className="px-3 py-2 text-slate-400">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl">Save Member</button>
-              </div>
-            </form>
           </div>
         </div>
       )}
