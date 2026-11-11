@@ -9,7 +9,7 @@ import {
   Award, TrendingUp, Settings, Sliders
 } from 'lucide-react';
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz4v1XX9-m0Zu_xEgEzyeCI361wydctuHupDCxgPEhfDWuqgD-AtVrESJ-s6cE4kA2xtA/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyOjJQ320CycSnIJnY2Q3Db2I9smikXEW-Q6rMJYygpkThESnr0XoppWaEKB7CptFg2/exec";
 
 const DEFAULT_PROJECTS = [
   { Project_ID: "PRJ-DEXTER", Project_Name: "Dexter Box", Full_Name: "Dexter Box Science Kits" },
