@@ -6,10 +6,10 @@ import {
   Edit3, Rocket, Check, X, Sun, Moon, Table, 
   CheckSquare, Square, ChevronRight, ChevronDown, 
   ListChecks, Tag, Calendar, 
-  Award, Settings, MapPin, Eye, Lock, Copy
+  Award, Settings, MapPin, Eye, Lock, Copy, Download
 } from 'lucide-react';
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwkPorOfbnqoZp9IFIvSp2DEHwoN1V3vw5rlZFSsvQSJG16PkV3Kt6k9ywvBRSmvTWX/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz4_ZqZiVVrmWu-na3UkP3NPoxh94dkVfzj1uftIh1e4cJ5Zsk8hmkT07A1oHMbh8D0/exec";
 
 const DEFAULT_PROJECTS = [
   { Project_ID: "PRJ-DEXTER", Project_Name: "Dexter Box", Full_Name: "Dexter Box Science Kits" },
@@ -183,7 +183,7 @@ function SearchableTagCombobox({ value, onChange, availableTags, onAddNewTag, is
     <div ref={containerRef} className="relative w-full">
       <div 
         onClick={() => setIsOpen(true)}
-        className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-medium border cursor-pointer transition ${
+        className={`flex items-center justify-between px-2.5 py-2 md:py-1.5 rounded-xl text-xs font-medium border cursor-pointer transition ${
           isDark 
             ? "bg-slate-950 border-slate-800 text-indigo-300 hover:border-slate-700" 
             : "bg-slate-50 border-slate-200 text-indigo-700 hover:border-slate-300"
@@ -247,10 +247,32 @@ function SearchableTagCombobox({ value, onChange, availableTags, onAddNewTag, is
 }
 
 export default function App() {
-  const [theme, setTheme] = useState(() => localStorage.getItem("ie_theme") || "light");
+  const [theme, setTheme] = useState(() => localStorage.getItem("ie_theme") || "dark");
   const [activeTab, setActiveTab] = useState("my_tasks");
   const [activeEmployeeEmail, setActiveEmployeeEmail] = useState(() => localStorage.getItem("ie_v3_active_emp") || "");
   const activeEmpRef = useRef(activeEmployeeEmail);
+
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showMobileAddDrawer, setShowMobileAddDrawer] = useState(false);
+
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  const handleInstallPwa = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === "accepted") {
+      setDeferredPrompt(null);
+      showToast("App installed to your home screen!");
+    }
+  };
 
   useEffect(() => {
     activeEmpRef.current = activeEmployeeEmail;
@@ -272,7 +294,6 @@ export default function App() {
   const currentMondayStr = getCurrentMondayStr();
   const weekDays = useMemo(() => getWeekDates(currentMondayStr), [currentMondayStr]);
 
-  // Task Creation Form
   const [quickTitle, setQuickTitle] = useState("");
   const [quickProject, setQuickProject] = useState("PRJ-MAKER");
   const [quickTag, setQuickTag] = useState("#SchoolVisit");
@@ -281,11 +302,9 @@ export default function App() {
   const [selectedCollaborators, setSelectedCollaborators] = useState([]);
   const [showCollabPicker, setShowCollabPicker] = useState(false);
 
-  // Learning Bucket Form
   const [newLearningTopic, setNewLearningTopic] = useState("");
   const [newLearningTag, setNewLearningTag] = useState("#R&D");
 
-  // Expanded Rows, Inline Editors & Delete Confirmations
   const [expandedRowIds, setExpandedRowIds] = useState({});
   const [newSubtaskInputs, setNewSubtaskInputs] = useState({});
   const [editingTitleId, setEditingTitleId] = useState(null);
@@ -295,33 +314,27 @@ export default function App() {
   const [showCompletedRows, setShowCompletedRows] = useState(false);
   const [showCompletedLearning, setShowCompletedLearning] = useState(false);
 
-  // Target Date Reschedule Modal
   const [rescheduleTarget, setRescheduleTarget] = useState(null);
   const [rescheduleNewDate, setRescheduleNewDate] = useState("");
   const [rescheduleReason, setRescheduleReason] = useState("");
 
-  // Guarded Completion
   const [completionGuardTarget, setCompletionGuardTarget] = useState(null);
   const [guardDurationInput, setGuardDurationInput] = useState(60);
 
-  // Modals & Drawers
   const [showStreakModal, setShowStreakModal] = useState(false);
   const [showGpModal, setShowGpModal] = useState(false);
   const [showLibraryManager, setShowLibraryManager] = useState(false);
   const [showEmpModal, setShowEmpModal] = useState(false);
 
-  // Employee Form
   const [newEmp, setNewEmp] = useState({ name: "", email: "", roleTitle: "STEM Facilitator", department: "Training & Delivery", level: "L3 Advanced", rnrSummary: "" });
   const [newTagInput, setNewTagInput] = useState("");
   const [newPrjCode, setNewPrjCode] = useState("");
   const [newPrjName, setNewPrjName] = useState("");
 
-  // Review & R&R
   const [reviewPeriod, setReviewPeriod] = useState("WEEK");
   const [isEditingRnR, setIsEditingRnR] = useState(false);
   const [rnrDraft, setRnrDraft] = useState("");
 
-  // Company Master View Modes
   const [companyMasterMode, setCompanyMasterMode] = useState("ROADMAP");
   const [companyFilterProject, setCompanyFilterProject] = useState("ALL");
   const [companyFilterMember, setCompanyFilterMember] = useState("ALL");
@@ -362,7 +375,6 @@ export default function App() {
 
         setEmployees(prev => {
           const merged = mergeById(Array.from(discoveredMap.values()), prev, "Email");
-          // Only set default employee if none is currently selected in ref or localStorage
           const currentSelected = activeEmpRef.current || localStorage.getItem("ie_v3_active_emp");
           if (!currentSelected && merged[0]) {
             setActiveEmployeeEmail(merged[0].Email);
@@ -608,7 +620,6 @@ export default function App() {
     });
   }, [companyMasterTasks, companyFilterProject, companyFilterMember, companyFilterTag]);
 
-  // Fixed: Strict task title matching so shared Project + Tag tasks never double-count hours
   const computeTimesheetMatrix = (logsSubset, tasksSubset) => {
     const matrixRows = [];
 
@@ -1084,6 +1095,7 @@ export default function App() {
     setQuickTitle("");
     setQuickSubtasksText("");
     setShowCollabPicker(false);
+    setShowMobileAddDrawer(false);
     showToast(`Added: "${quickTitle.trim()}"!`);
 
     try {
@@ -1242,27 +1254,37 @@ export default function App() {
   const isDark = theme === "dark";
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans transition-colors ${isDark ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-900"}`}>
+    <div className={`min-h-screen flex flex-col font-sans pb-20 md:pb-6 transition-colors ${isDark ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-900"}`}>
       
-      {/* ================= MINIMAL TOP NAV ================= */}
+      {/* TOP NAV */}
       <header className={`border-b sticky top-0 z-40 backdrop-blur ${isDark ? "bg-slate-900/90 border-slate-800" : "bg-white/95 border-slate-200"}`}>
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold shadow-sm">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 h-14 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold shadow-sm shrink-0">
               <Table className="h-4 w-4" />
             </div>
             <div>
-              <span className="font-bold text-base tracking-tight">IE Workspace</span>
-              <span className="text-[11px] text-slate-400 hidden sm:inline ml-2">Goal & Time OS</span>
+              <span className="font-bold text-sm sm:text-base tracking-tight">IE Workspace</span>
+              <span className="text-[11px] text-slate-400 hidden lg:inline ml-2">Goal & Time OS</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2.5">
+            {deferredPrompt && (
+              <button
+                type="button"
+                onClick={handleInstallPwa}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-sm hover:bg-emerald-500 transition cursor-pointer"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span>Install App</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => setShowGpModal(true)}
-              title="Click to view personal GP receipt"
-              className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/10 text-indigo-500 border border-indigo-500/30 hover:bg-indigo-500/20 transition cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-500/10 text-indigo-500 border border-indigo-500/30 hover:bg-indigo-500/20 transition cursor-pointer"
             >
               <Award className="h-3.5 w-3.5" />
               <span>{personalGpData.totalGp} GP</span>
@@ -1271,18 +1293,17 @@ export default function App() {
             <button
               type="button"
               onClick={() => setShowStreakModal(true)}
-              title="Click to view activity history"
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20 hover:bg-amber-500/20 transition cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20 hover:bg-amber-500/20 transition cursor-pointer"
             >
               <Flame className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
-              <span>{currentStreak}d Streak</span>
+              <span>{currentStreak}d</span>
             </button>
 
             {employees.length > 0 && (
               <select
                 value={activeEmployeeEmail}
                 onChange={(e) => setActiveEmployeeEmail(e.target.value)}
-                className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border focus:outline-none ${isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-slate-200 text-slate-800"}`}
+                className={`text-xs font-semibold px-2 py-1.5 rounded-lg border max-w-[100px] sm:max-w-none truncate focus:outline-none ${isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-white border-slate-200 text-slate-800"}`}
               >
                 {employees.map(emp => (
                   <option key={emp.Email} value={emp.Email}>{emp.Name || emp.Email}</option>
@@ -1293,17 +1314,15 @@ export default function App() {
             <button
               type="button"
               onClick={() => setShowLibraryManager(true)}
-              title="Manage Projects & Tags"
-              className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1 transition ${isDark ? "bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"}`}
+              className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1 transition ${isDark ? "bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"}`}
             >
               <Settings className="h-3.5 w-3.5 text-indigo-500" />
-              <span className="hidden sm:inline">Tags & Projects</span>
+              <span className="hidden md:inline">Tags & Projects</span>
             </button>
 
             <button
               type="button"
               onClick={() => setShowEmpModal(true)}
-              title="Add Team Member"
               className={`p-1.5 rounded-lg border text-xs ${isDark ? "bg-slate-800 border-slate-700 text-slate-200" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"}`}
             >
               <UserPlus className="h-3.5 w-3.5 text-indigo-500" />
@@ -1312,7 +1331,6 @@ export default function App() {
             <button
               type="button"
               onClick={() => fetchSheetData(false)}
-              title="Sync with Google Sheet"
               className={`p-1.5 rounded-lg border ${isDark ? "bg-slate-800 border-slate-700 text-slate-300" : "bg-white border-slate-200 text-slate-500 hover:text-slate-900"}`}
             >
               <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin text-indigo-500' : ''}`} />
@@ -1321,7 +1339,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setTheme(isDark ? "light" : "dark")}
-              className={`p-1.5 rounded-lg border ${isDark ? "bg-slate-800 border-slate-700 text-amber-400" : "bg-white border-slate-200 text-slate-600"}`}
+              className={`hidden sm:block p-1.5 rounded-lg border ${isDark ? "bg-slate-800 border-slate-700 text-amber-400" : "bg-white border-slate-200 text-slate-600"}`}
             >
               {isDark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
             </button>
@@ -1330,22 +1348,22 @@ export default function App() {
       </header>
 
       {toastMessage && (
-        <div className="fixed bottom-5 right-5 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-medium flex items-center gap-2 shadow-xl z-50">
+        <div className="fixed bottom-20 md:bottom-5 right-4 left-4 md:left-auto px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-medium flex items-center gap-2 shadow-xl z-50">
           <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* ================= MAIN WORKSPACE ================= */}
-      <main className="max-w-6xl mx-auto px-4 py-6 flex-1 w-full space-y-5">
+      {/* MAIN WORKSPACE */}
+      <main className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 flex-1 w-full space-y-4 sm:space-y-5">
 
-        {/* 4 WORKBOOK TABS */}
-        <div className={`flex items-center justify-between border-b ${isDark ? "border-slate-800" : "border-slate-200"}`}>
-          <div className="flex items-center gap-1 text-xs sm:text-sm overflow-x-auto">
+        {/* DESKTOP TOP TABS */}
+        <div className={`hidden md:flex items-center justify-between border-b ${isDark ? "border-slate-800" : "border-slate-200"}`}>
+          <div className="flex items-center gap-1 text-sm">
             <button
               type="button"
               onClick={() => setActiveTab("my_tasks")}
-              className={`px-4 py-2.5 font-semibold rounded-t-xl border-t border-x transition flex items-center gap-1.5 shrink-0 ${
+              className={`px-4 py-2.5 font-semibold rounded-t-xl border-t border-x transition flex items-center gap-1.5 ${
                 activeTab === "my_tasks"
                   ? (isDark ? "bg-slate-900 border-slate-800 text-indigo-400" : "bg-white border-slate-200 text-indigo-600 shadow-sm")
                   : "border-transparent text-slate-500 hover:text-slate-800"
@@ -1357,7 +1375,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setActiveTab("learning")}
-              className={`px-4 py-2.5 font-semibold rounded-t-xl border-t border-x transition flex items-center gap-1.5 shrink-0 ${
+              className={`px-4 py-2.5 font-semibold rounded-t-xl border-t border-x transition flex items-center gap-1.5 ${
                 activeTab === "learning"
                   ? (isDark ? "bg-slate-900 border-slate-800 text-indigo-400" : "bg-white border-slate-200 text-indigo-600 shadow-sm")
                   : "border-transparent text-slate-500 hover:text-slate-800"
@@ -1369,7 +1387,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setActiveTab("monthly_review")}
-              className={`px-4 py-2.5 font-semibold rounded-t-xl border-t border-x transition flex items-center gap-1.5 shrink-0 ${
+              className={`px-4 py-2.5 font-semibold rounded-t-xl border-t border-x transition flex items-center gap-1.5 ${
                 activeTab === "monthly_review"
                   ? (isDark ? "bg-slate-900 border-slate-800 text-indigo-400" : "bg-white border-slate-200 text-indigo-600 shadow-sm")
                   : "border-transparent text-slate-500 hover:text-slate-800"
@@ -1381,7 +1399,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setActiveTab("company_master")}
-              className={`px-4 py-2.5 font-semibold rounded-t-xl border-t border-x transition flex items-center gap-1.5 shrink-0 ${
+              className={`px-4 py-2.5 font-semibold rounded-t-xl border-t border-x transition flex items-center gap-1.5 ${
                 activeTab === "company_master"
                   ? (isDark ? "bg-slate-900 border-slate-800 text-indigo-400" : "bg-white border-slate-200 text-indigo-600 shadow-sm")
                   : "border-transparent text-slate-500 hover:text-slate-800"
@@ -1392,43 +1410,61 @@ export default function App() {
           </div>
         </div>
 
-        {/* ================= TAB 1: MY TASKS & SUB-TASKS ================= */}
+        {/* TAB 1: MY TASKS & SUB-TASKS */}
         {activeTab === "my_tasks" && (
           <div className="space-y-4">
-            <form onSubmit={handleCreateTaskRow} className={`p-3.5 rounded-2xl border shadow-sm space-y-2.5 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-                <div className="sm:col-span-4">
+            <div className="md:hidden">
+              {!showMobileAddDrawer && (
+                <button
+                  type="button"
+                  onClick={() => setShowMobileAddDrawer(true)}
+                  className="w-full py-3 px-4 rounded-2xl bg-indigo-600 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-md"
+                >
+                  <Plus className="h-4 w-4" /> Add New Task / School Visit
+                </button>
+              )}
+            </div>
+
+            <form 
+              onSubmit={handleCreateTaskRow} 
+              className={`${showMobileAddDrawer ? "block" : "hidden"} md:block p-3.5 rounded-2xl border shadow-sm space-y-2.5 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}
+            >
+              <div className="flex justify-between items-center md:hidden pb-1">
+                <span className="text-xs font-bold text-indigo-400">New Task / School Visit</span>
+                <button type="button" onClick={() => setShowMobileAddDrawer(false)}><X className="h-4 w-4 text-slate-400" /></button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center">
+                <div className="md:col-span-4">
                   <input
                     type="text"
                     required
                     value={quickTitle}
                     onChange={(e) => setQuickTitle(e.target.value)}
                     placeholder="Task or School Visit (e.g. AMT School Science Mela)"
-                    className={`w-full px-3 py-2 rounded-xl text-xs sm:text-sm border focus:outline-none ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-900 focus:bg-white"}`}
+                    className={`w-full px-3 py-2.5 md:py-2 rounded-xl text-xs sm:text-sm border focus:outline-none ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-900 focus:bg-white"}`}
                   />
                 </div>
 
-                <div className="sm:col-span-3">
+                <div className="md:col-span-3">
                   <input
                     type="text"
                     value={quickSubtasksText}
                     onChange={(e) => setQuickSubtasksText(e.target.value)}
-                    placeholder="Sub-tasks, comma-separated (e.g. Pack kits, Print posters)"
-                    className={`w-full px-3 py-2 rounded-xl text-xs border focus:outline-none ${isDark ? "bg-slate-950 border-slate-800 text-slate-200" : "bg-slate-50 border-slate-200 text-slate-700 focus:bg-white"}`}
+                    placeholder="Sub-tasks, comma-separated (optional)"
+                    className={`w-full px-3 py-2.5 md:py-2 rounded-xl text-xs border focus:outline-none ${isDark ? "bg-slate-950 border-slate-800 text-slate-200" : "bg-slate-50 border-slate-200 text-slate-700 focus:bg-white"}`}
                   />
                 </div>
 
-                <div className="sm:col-span-2">
+                <div className="grid grid-cols-2 md:col-span-3 gap-2">
                   <select
                     value={quickProject}
                     onChange={(e) => setQuickProject(e.target.value)}
-                    className={`w-full px-2.5 py-2 rounded-xl text-xs font-medium border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"}`}
+                    className={`w-full px-2.5 py-2.5 md:py-2 rounded-xl text-xs font-medium border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"}`}
                   >
                     {projects.map(p => <option key={p.Project_ID} value={p.Project_ID}>{p.Project_Name}</option>)}
                   </select>
-                </div>
 
-                <div className="sm:col-span-1">
                   <SearchableTagCombobox
                     value={quickTag}
                     onChange={setQuickTag}
@@ -1439,16 +1475,16 @@ export default function App() {
                   />
                 </div>
 
-                <div className="sm:col-span-2 flex items-center gap-1.5">
+                <div className="md:col-span-2 flex items-center gap-1.5">
                   <input
                     type="date"
                     value={quickDeadline}
                     onChange={(e) => setQuickDeadline(e.target.value)}
-                    className={`w-full px-2 py-2 rounded-xl text-xs font-mono border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-700"}`}
+                    className={`w-full px-2 py-2.5 md:py-2 rounded-xl text-xs font-mono border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-700"}`}
                   />
                   <button
                     type="submit"
-                    className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shrink-0 shadow-sm cursor-pointer"
+                    className="px-4 py-2.5 md:py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shrink-0 shadow-sm cursor-pointer"
                   >
                     + Add
                   </button>
@@ -1477,23 +1513,187 @@ export default function App() {
                             if (isSel && selectedCollaborators.length > 1) setSelectedCollaborators(selectedCollaborators.filter(e => e !== emp.Email));
                             else if (!isSel) setSelectedCollaborators([...selectedCollaborators, emp.Email]);
                           }}
-                          className={`px-2 py-0.5 rounded-full text-[11px] border transition ${isSel ? "bg-indigo-600 text-white border-indigo-600" : isDark ? "bg-slate-950 border-slate-800 text-slate-400" : "bg-slate-100 border-slate-200 text-slate-600"}`}
+                          className={`px-2.5 py-1 rounded-full text-[11px] border transition ${isSel ? "bg-indigo-600 text-white border-indigo-600" : isDark ? "bg-slate-950 border-slate-800 text-slate-400" : "bg-slate-100 border-slate-200 text-slate-600"}`}
                         >
                           {emp.Name || emp.Email} {isSel && "✓"}
                         </button>
                       );
                     })}
                   </div>
-                  <span className="text-[11px] text-slate-400 hidden sm:inline">
-                    Tagging as #SchoolVisit reveals 1-tap Half Day (3h) and Full Day (6h) buttons!
-                  </span>
                 </div>
               )}
             </form>
 
-            <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+            {/* MOBILE TASK CARDS */}
+            <div className="md:hidden space-y-3">
+              {activeTasks.length === 0 ? (
+                <div className={`p-8 text-center rounded-2xl border text-xs text-slate-400 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+                  Your active task list is clear! Tap "+ Add New Task" above.
+                </div>
+              ) : (
+                activeTasks.map(row => {
+                  const mins = Number(row.Auto_Learning_Hours || 0);
+                  const subtasks = parseSubtasks(row);
+                  const doneSubCount = subtasks.filter(s => s.done).length;
+                  const isSchoolVisit = (row.Task_Code || "").toLowerCase().includes("schoolvisit");
+                  const prog = subtasks.length > 0
+                    ? Math.round((doneSubCount / subtasks.length) * 100)
+                    : Number(row.Auto_Task_Hours || 0);
+                  const due = normalizeDateStr(row.Target_Deadline);
+                  const isOverdue = due && due < todayStr;
+                  const isExpanded = Boolean(expandedRowIds[row.Pulse_ID]);
+
+                  return (
+                    <div key={row.Pulse_ID} className={`p-4 rounded-2xl border shadow-sm space-y-3 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-1 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${isDark ? "bg-indigo-500/15 text-indigo-300" : "bg-indigo-50 text-indigo-700"}`}>
+                              {getProjectLabel(row.Project_ID)}
+                            </span>
+                            <span className="px-2 py-0.5 rounded bg-slate-500/10 text-[10px] font-medium">
+                              {row.Task_Code || "#General"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRescheduleTarget(row);
+                                setRescheduleNewDate(due || todayStr);
+                                setRescheduleReason("");
+                              }}
+                              className={`text-[10px] font-mono px-1.5 py-0.5 rounded border inline-flex items-center gap-1 ${isOverdue ? "text-rose-400 border-rose-500/30 bg-rose-500/10" : "text-slate-400 border-slate-700"}`}
+                            >
+                              <Lock className="h-2.5 w-2.5" /> {due || todayStr}
+                            </button>
+                          </div>
+
+                          <h3 className="font-bold text-sm leading-snug pt-0.5">{row.Monday_Commitment}</h3>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button type="button" onClick={() => handleDuplicateTaskRow(row)} className="p-1.5 text-slate-400 hover:text-indigo-400">
+                            <Copy className="h-4 w-4" />
+                          </button>
+                          {confirmDeleteId === row.Pulse_ID ? (
+                            <button type="button" onClick={() => handleDeleteTaskRow(row)} className="px-2 py-1 rounded bg-rose-600 text-white text-[11px] font-bold">
+                              Delete?
+                            </button>
+                          ) : (
+                            <button type="button" onClick={() => setConfirmDeleteId(row.Pulse_ID)} className="p-1.5 text-slate-400 hover:text-rose-500">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2 flex-1">
+                          <div className={`w-24 h-2 rounded-full overflow-hidden ${isDark ? "bg-slate-800" : "bg-slate-200"}`}>
+                            <div className="bg-indigo-600 h-full" style={{ width: `${prog}%` }} />
+                          </div>
+                          <span className="font-mono font-bold text-indigo-400">{prog}%</span>
+                        </div>
+                        <span className="font-mono font-semibold text-slate-400">Logged: {(mins / 60).toFixed(1)}h</span>
+                      </div>
+
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedRowIds(prev => ({ ...prev, [row.Pulse_ID]: !isExpanded }))}
+                          className="text-xs font-semibold text-indigo-400 flex items-center gap-1"
+                        >
+                          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                          <span>Sub-Tasks ({doneSubCount}/{subtasks.length})</span>
+                        </button>
+
+                        {isExpanded && (
+                          <div className="mt-2 space-y-1.5 pl-2 border-l-2 border-indigo-500/30">
+                            {subtasks.map((sub, idx) => (
+                              <label key={sub.id} className="flex items-center justify-between text-xs py-1">
+                                <span className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={sub.done}
+                                    onChange={() => handleToggleSubtask(row, sub.id)}
+                                    className="h-4 w-4 rounded accent-indigo-600"
+                                  />
+                                  <span className={sub.done ? "line-through text-slate-400" : ""}>{idx + 1}. {sub.title}</span>
+                                </span>
+                                <button type="button" onClick={() => handleDeleteSubtask(row, sub.id)} className="text-slate-400">
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </label>
+                            ))}
+                            <div className="flex gap-1.5 pt-1">
+                              <input
+                                type="text"
+                                value={newSubtaskInputs[row.Pulse_ID] || ""}
+                                onChange={(e) => setNewSubtaskInputs(prev => ({ ...prev, [row.Pulse_ID]: e.target.value }))}
+                                placeholder="Add sub-task..."
+                                className={`flex-1 px-2.5 py-1.5 rounded-lg text-xs border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`}
+                              />
+                              <button type="button" onClick={() => handleAddSubtaskToRow(row)} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold">
+                                Add
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 pt-1">
+                        {isSchoolVisit ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleQuickLogTimeOnRow(row, 180, false)}
+                              className={`py-2 rounded-xl text-xs font-bold border ${isDark ? "bg-slate-800 border-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 text-slate-800"}`}
+                            >
+                              Half (3h)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleQuickLogTimeOnRow(row, 360, false)}
+                              className={`py-2 rounded-xl text-xs font-bold border ${isDark ? "bg-slate-800 border-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 text-slate-800"}`}
+                            >
+                              Full (6h)
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleQuickLogTimeOnRow(row, 30, false)}
+                              className={`py-2 rounded-xl text-xs font-mono font-bold border ${isDark ? "bg-slate-800 border-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 text-slate-800"}`}
+                            >
+                              +30m
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleQuickLogTimeOnRow(row, 60, false)}
+                              className={`py-2 rounded-xl text-xs font-mono font-bold border ${isDark ? "bg-slate-800 border-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 text-slate-800"}`}
+                            >
+                              +1h
+                            </button>
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleQuickLogTimeOnRow(row, 0, true)}
+                          className="py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow-sm"
+                        >
+                          Done ✓
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* DESKTOP TABLE */}
+            <div className={`hidden md:block border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                <table className="w-full text-left border-collapse text-sm">
                   <thead>
                     <tr className={`border-b text-[11px] uppercase tracking-wider font-semibold ${isDark ? "bg-slate-950/60 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
                       <th className="py-3 px-3 w-10 text-center">Done</th>
@@ -1537,7 +1737,6 @@ export default function App() {
                                 <button
                                   type="button"
                                   onClick={() => handleQuickLogTimeOnRow(row, 0, true)}
-                                  title="Mark Done"
                                   className="text-slate-400 hover:text-emerald-500 transition"
                                 >
                                   <Square className="h-4 w-4" />
@@ -1570,7 +1769,6 @@ export default function App() {
                                     <span
                                       onClick={() => { setEditingTitleId(row.Pulse_ID); setEditingTitleDraft(row.Monday_Commitment); }}
                                       className="cursor-pointer hover:underline flex items-center gap-1 group"
-                                      title="Click to edit title"
                                     >
                                       <span>{row.Monday_Commitment}</span>
                                       <Edit3 className="h-3 w-3 opacity-0 group-hover:opacity-60 text-indigo-400" />
@@ -1587,7 +1785,6 @@ export default function App() {
                                     <button
                                       type="button"
                                       onClick={() => setCoOwnerPopoverId(isCoOwnerPopoverOpen ? null : row.Pulse_ID)}
-                                      title="Click to assign or remove Co-Owners"
                                       className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold flex items-center gap-1 transition cursor-pointer ${
                                         collabList.length > 1
                                           ? "bg-indigo-500/15 text-indigo-400 border-indigo-500/30"
@@ -1664,7 +1861,6 @@ export default function App() {
                                     setRescheduleNewDate(due || todayStr);
                                     setRescheduleReason("");
                                   }}
-                                  title="Target Date is locked — click to reschedule with a reason"
                                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-mono transition cursor-pointer ${
                                     isOverdue
                                       ? "border-rose-500/30 bg-rose-500/10 text-rose-400"
@@ -1738,7 +1934,6 @@ export default function App() {
                                   <button
                                     type="button"
                                     onClick={() => handleDuplicateTaskRow(row)}
-                                    title="Duplicate / Copy Task"
                                     className="p-1 text-slate-400 hover:text-indigo-500 transition"
                                   >
                                     <Copy className="h-3.5 w-3.5" />
@@ -1756,7 +1951,6 @@ export default function App() {
                                     <button
                                       type="button"
                                       onClick={() => setConfirmDeleteId(row.Pulse_ID)}
-                                      title="Delete Task"
                                       className="p-1 text-slate-400 hover:text-rose-500 transition"
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
@@ -1842,64 +2036,54 @@ export default function App() {
                   </tbody>
                 </table>
               </div>
-
-              {completedTasks.length > 0 && (
-                <div className={`border-t px-4 py-2.5 text-xs ${isDark ? "border-slate-800 bg-slate-950/50" : "border-slate-200 bg-slate-50"}`}>
-                  <button
-                    type="button"
-                    onClick={() => setShowCompletedRows(!showCompletedRows)}
-                    className="font-semibold text-slate-500 hover:text-indigo-500 flex items-center gap-1.5"
-                  >
-                    <CheckSquare className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>{showCompletedRows ? "Hide" : "Show"} Completed Tasks ({completedTasks.length})</span>
-                  </button>
-
-                  {showCompletedRows && (
-                    <div className="mt-2 space-y-1.5 pt-2 border-t border-slate-200/50">
-                      {completedTasks.map(c => (
-                        <div key={c.Pulse_ID} className="flex items-center justify-between py-1 text-slate-400">
-                          <span className="line-through">{c.Monday_Commitment} ({getProjectLabel(c.Project_ID)}) • {c.Task_Code}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-emerald-500 font-semibold">
-                              ✓ 100% Done ({(Number(c.Auto_Learning_Hours || 0) / 60).toFixed(1)}h)
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleDuplicateTaskRow(c)}
-                              title="Copy / Re-run Task"
-                              className="text-slate-400 hover:text-indigo-500"
-                            >
-                              <Copy className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteTaskRow(c)}
-                              title="Delete Completed Row"
-                              className="text-slate-400 hover:text-rose-500"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
+
+            {completedTasks.length > 0 && (
+              <div className={`border rounded-2xl px-4 py-3 text-xs ${isDark ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-white"}`}>
+                <button
+                  type="button"
+                  onClick={() => setShowCompletedRows(!showCompletedRows)}
+                  className="font-semibold text-slate-500 hover:text-indigo-500 flex items-center gap-1.5"
+                >
+                  <CheckSquare className="h-3.5 w-3.5 text-emerald-500" />
+                  <span>{showCompletedRows ? "Hide" : "Show"} Completed Tasks ({completedTasks.length})</span>
+                </button>
+
+                {showCompletedRows && (
+                  <div className="mt-2.5 space-y-2 pt-2 border-t border-slate-200/30">
+                    {completedTasks.map(c => (
+                      <div key={c.Pulse_ID} className="flex items-center justify-between py-1 text-slate-400">
+                        <span className="line-through truncate pr-2">{c.Monday_Commitment} ({getProjectLabel(c.Project_ID)})</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-mono text-emerald-500 font-semibold">
+                            ✓ {(Number(c.Auto_Learning_Hours || 0) / 60).toFixed(1)}h
+                          </span>
+                          <button type="button" onClick={() => handleDuplicateTaskRow(c)} className="text-slate-400 hover:text-indigo-500">
+                            <Copy className="h-3.5 w-3.5" />
+                          </button>
+                          <button type="button" onClick={() => handleDeleteTaskRow(c)} className="text-slate-400 hover:text-rose-500">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {/* ================= TAB 2: LEARNING LOG ================= */}
+        {/* TAB 2: LEARNING LOG */}
         {activeTab === "learning" && (
           <div className="space-y-4">
-            <form onSubmit={handleCreateLearningItem} className={`p-3.5 rounded-2xl border shadow-sm space-y-2 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <form onSubmit={handleCreateLearningItem} className={`p-3.5 rounded-2xl border shadow-sm space-y-2.5 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                 <span className="text-xs font-semibold text-indigo-500 flex items-center gap-1.5">
-                  <GraduationCap className="h-4 w-4" /> Add Topic to Learning Bucket (Plan now, log effort as you practice)
+                  <GraduationCap className="h-4 w-4" /> Add Topic to Learning Bucket
                 </span>
                 <span className="text-[11px] text-slate-400">
-                  Earns +15 GP for every 30 mins logged!
+                  Earns +15 GP per 30 mins logged
                 </span>
               </div>
 
@@ -1910,8 +2094,8 @@ export default function App() {
                     required
                     value={newLearningTopic}
                     onChange={(e) => setNewLearningTopic(e.target.value)}
-                    placeholder="Skill or topic (e.g. ESP32 Wi-Fi mesh telemetry, Laser cut kerf tolerances)"
-                    className={`w-full px-3 py-2 rounded-xl text-xs sm:text-sm border focus:outline-none ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-900 focus:bg-white"}`}
+                    placeholder="Skill or topic (e.g. ESP32 Wi-Fi mesh telemetry)"
+                    className={`w-full px-3 py-2.5 sm:py-2 rounded-xl text-xs sm:text-sm border focus:outline-none ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-900 focus:bg-white"}`}
                   />
                 </div>
 
@@ -1929,7 +2113,7 @@ export default function App() {
                 <div className="sm:col-span-1">
                   <button
                     type="submit"
-                    className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold shrink-0 cursor-pointer"
+                    className="w-full py-2.5 sm:py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold shrink-0 cursor-pointer"
                   >
                     + Add
                   </button>
@@ -1937,8 +2121,44 @@ export default function App() {
               </div>
             </form>
 
-            <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
-              <table className="w-full text-left border-collapse text-xs sm:text-sm">
+            <div className="md:hidden space-y-3">
+              {activeLearningItems.length === 0 ? (
+                <div className={`p-8 text-center rounded-2xl border text-xs text-slate-400 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+                  Your learning bucket is empty. Add a skill above!
+                </div>
+              ) : (
+                activeLearningItems.map(item => {
+                  const mins = Number(item.Auto_Learning_Hours || 0);
+                  return (
+                    <div key={item.Pulse_ID} className={`p-4 rounded-2xl border shadow-sm space-y-3 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/15 text-purple-400">
+                            {item.Task_Code || "#Learning"}
+                          </span>
+                          <h3 className="font-bold text-sm mt-1">{item.Monday_Commitment}</h3>
+                        </div>
+                        <span className="font-mono text-xs font-bold text-purple-400">{(mins / 60).toFixed(1)}h</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button type="button" onClick={() => handleQuickLogTimeOnRow(item, 30, false)} className={`py-2 rounded-xl text-xs font-mono font-bold border ${isDark ? "bg-slate-800 border-slate-700" : "bg-slate-100 border-slate-200"}`}>
+                          +30m
+                        </button>
+                        <button type="button" onClick={() => handleQuickLogTimeOnRow(item, 60, false)} className={`py-2 rounded-xl text-xs font-mono font-bold border ${isDark ? "bg-slate-800 border-slate-700" : "bg-slate-100 border-slate-200"}`}>
+                          +1h
+                        </button>
+                        <button type="button" onClick={() => handleQuickLogTimeOnRow(item, 0, true)} className="py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white">
+                          Done ✓
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className={`hidden md:block border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+              <table className="w-full text-left border-collapse text-sm">
                 <thead>
                   <tr className={`border-b text-[11px] uppercase font-semibold ${isDark ? "bg-slate-950/60 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
                     <th className="py-3 px-4">Skill / Topic Bucket</th>
@@ -1959,9 +2179,7 @@ export default function App() {
                       const mins = Number(item.Auto_Learning_Hours || 0);
                       return (
                         <tr key={item.Pulse_ID} className={`transition ${isDark ? "hover:bg-slate-800/40" : "hover:bg-slate-50/80"}`}>
-                          <td className="py-3 px-4 font-medium">
-                            {item.Monday_Commitment}
-                          </td>
+                          <td className="py-3 px-4 font-medium">{item.Monday_Commitment}</td>
                           <td className="py-3 px-3">
                             <span className="px-2 py-0.5 rounded text-xs font-semibold bg-purple-500/10 text-purple-500">
                               {item.Task_Code || "#Learning"}
@@ -1972,41 +2190,19 @@ export default function App() {
                           </td>
                           <td className="py-3 px-4 text-right">
                             <div className="inline-flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleQuickLogTimeOnRow(item, 30, false)}
-                                className={`px-2 py-1 rounded text-[11px] font-mono font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}
-                              >
+                              <button type="button" onClick={() => handleQuickLogTimeOnRow(item, 30, false)} className={`px-2 py-1 rounded text-[11px] font-mono font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}>
                                 +30m
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => handleQuickLogTimeOnRow(item, 60, false)}
-                                className={`px-2 py-1 rounded text-[11px] font-mono font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}
-                              >
+                              <button type="button" onClick={() => handleQuickLogTimeOnRow(item, 60, false)} className={`px-2 py-1 rounded text-[11px] font-mono font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}>
                                 +1h
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => handleQuickLogTimeOnRow(item, 0, true)}
-                                className="px-2 py-1 rounded text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition"
-                              >
+                              <button type="button" onClick={() => handleQuickLogTimeOnRow(item, 0, true)} className="px-2 py-1 rounded text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition">
                                 Done ✓
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDuplicateTaskRow(item)}
-                                title="Copy Learning Item"
-                                className="p-1 text-slate-400 hover:text-indigo-500"
-                              >
+                              <button type="button" onClick={() => handleDuplicateTaskRow(item)} className="p-1 text-slate-400 hover:text-indigo-500">
                                 <Copy className="h-3.5 w-3.5" />
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteTaskRow(item)}
-                                title="Delete Learning Item"
-                                className="p-1 text-slate-400 hover:text-rose-500"
-                              >
+                              <button type="button" onClick={() => handleDeleteTaskRow(item)} className="p-1 text-slate-400 hover:text-rose-500">
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </div>
@@ -2017,67 +2213,41 @@ export default function App() {
                   )}
                 </tbody>
               </table>
-
-              {completedLearningItems.length > 0 && (
-                <div className={`border-t px-4 py-2.5 text-xs ${isDark ? "border-slate-800 bg-slate-950/50" : "border-slate-200 bg-slate-50"}`}>
-                  <button
-                    type="button"
-                    onClick={() => setShowCompletedLearning(!showCompletedLearning)}
-                    className="font-semibold text-slate-500 hover:text-indigo-500 flex items-center gap-1.5"
-                  >
-                    <CheckSquare className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>{showCompletedLearning ? "Hide" : "Show"} Completed Skills ({completedLearningItems.length})</span>
-                  </button>
-
-                  {showCompletedLearning && (
-                    <div className="mt-2 space-y-1.5 pt-2 border-t border-slate-200/50">
-                      {completedLearningItems.map(c => (
-                        <div key={c.Pulse_ID} className="flex items-center justify-between py-1 text-slate-400">
-                          <span className="line-through">{c.Monday_Commitment} ({c.Task_Code})</span>
-                          <span className="font-mono text-emerald-500 font-semibold">
-                            ✓ Mastered ({(Number(c.Auto_Learning_Hours || 0) / 60).toFixed(1)}h)
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         )}
 
-        {/* ================= TAB 3: MONTHLY & GOAL REVIEW ================= */}
+        {/* TAB 3: MONTHLY & GOAL REVIEW */}
         {activeTab === "monthly_review" && (
           <div className="space-y-5">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <div>
                 <h2 className="text-base font-bold">Personal Monthly & Goal Review</h2>
                 <p className="text-xs text-slate-400">Day-by-day effort & KRAs for {currentEmp.Name}</p>
               </div>
-              <div className={`flex p-1 rounded-xl border text-xs ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+              <div className={`flex p-1 rounded-xl border text-xs shrink-0 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
                 <button
                   type="button"
                   onClick={() => setReviewPeriod("WEEK")}
-                  className={`px-3 py-1 rounded-lg font-semibold ${reviewPeriod === "WEEK" ? "bg-indigo-600 text-white" : "text-slate-500"}`}
+                  className={`px-2.5 py-1 rounded-lg font-semibold ${reviewPeriod === "WEEK" ? "bg-indigo-600 text-white" : "text-slate-500"}`}
                 >
                   This Week
                 </button>
                 <button
                   type="button"
                   onClick={() => setReviewPeriod("MONTH")}
-                  className={`px-3 py-1 rounded-lg font-semibold ${reviewPeriod === "MONTH" ? "bg-indigo-600 text-white" : "text-slate-500"}`}
+                  className={`px-2.5 py-1 rounded-lg font-semibold ${reviewPeriod === "MONTH" ? "bg-indigo-600 text-white" : "text-slate-500"}`}
                 >
                   This Month
                 </button>
               </div>
             </div>
 
-            <div className={`p-5 rounded-2xl border shadow-sm space-y-3 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+            <div className={`p-4 sm:p-5 rounded-2xl border shadow-sm space-y-3 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-indigo-500" />
-                  <h3 className="font-bold text-sm">My Weekly Effort Matrix ({currentMondayStr} – Sat)</h3>
+                  <h3 className="font-bold text-sm">My Weekly Effort Matrix ({currentMondayStr.slice(5)} – Sat)</h3>
                 </div>
                 <span className="text-xs text-indigo-500 font-mono font-bold">
                   Total: {personalTimesheetMatrix.reduce((a, b) => a + Number(b.totalHours), 0).toFixed(1)} hrs
@@ -2085,7 +2255,7 @@ export default function App() {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
+                <table className="w-full text-left border-collapse text-xs min-w-[540px]">
                   <thead>
                     <tr className={`border-b text-[11px] uppercase font-semibold ${isDark ? "bg-slate-950/60 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
                       <th className="py-2.5 px-3">Deliverable / Visit</th>
@@ -2135,33 +2305,33 @@ export default function App() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-              <div className={`p-4 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
-                <span className="text-xs text-slate-400 block">Personal Goal Completion</span>
-                <span className="text-2xl font-bold font-mono text-emerald-500">{reviewMetrics.goalCompletionRate}%</span>
-                <span className="text-[11px] text-slate-400 block mt-0.5">{reviewMetrics.completedGoals} of {reviewMetrics.totalGoals} goals shipped</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className={`p-3.5 sm:p-4 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
+                <span className="text-[11px] sm:text-xs text-slate-400 block">Goal Completion</span>
+                <span className="text-xl sm:text-2xl font-bold font-mono text-emerald-500">{reviewMetrics.goalCompletionRate}%</span>
+                <span className="text-[10px] sm:text-[11px] text-slate-400 block mt-0.5">{reviewMetrics.completedGoals} of {reviewMetrics.totalGoals} shipped</span>
               </div>
 
-              <div className={`p-4 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
-                <span className="text-xs text-slate-400 block">Total Logged Hours</span>
-                <span className="text-2xl font-bold font-mono text-indigo-500">{reviewMetrics.totalHours}h</span>
-                <span className="text-[11px] text-slate-400 block mt-0.5">{reviewMetrics.projectHours}h Work Effort</span>
+              <div className={`p-3.5 sm:p-4 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
+                <span className="text-[11px] sm:text-xs text-slate-400 block">Total Logged Hours</span>
+                <span className="text-xl sm:text-2xl font-bold font-mono text-indigo-500">{reviewMetrics.totalHours}h</span>
+                <span className="text-[10px] sm:text-[11px] text-slate-400 block mt-0.5">{reviewMetrics.projectHours}h Work Effort</span>
               </div>
 
-              <div className={`p-4 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
-                <span className="text-xs text-slate-400 block">Upskilling Invested</span>
-                <span className="text-2xl font-bold font-mono text-purple-500">{reviewMetrics.learningHours}h</span>
-                <span className="text-[11px] text-slate-400 block mt-0.5">Deliberate Learning</span>
+              <div className={`p-3.5 sm:p-4 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
+                <span className="text-[11px] sm:text-xs text-slate-400 block">Upskilling Invested</span>
+                <span className="text-xl sm:text-2xl font-bold font-mono text-purple-500">{reviewMetrics.learningHours}h</span>
+                <span className="text-[10px] sm:text-[11px] text-slate-400 block mt-0.5">Deliberate Learning</span>
               </div>
 
-              <div className={`p-4 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
-                <span className="text-xs text-slate-400 block">Active Consistency</span>
-                <span className="text-2xl font-bold font-mono text-amber-500">{currentStreak} Days</span>
-                <span className="text-[11px] text-slate-400 block mt-0.5">Continuous Streak</span>
+              <div className={`p-3.5 sm:p-4 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
+                <span className="text-[11px] sm:text-xs text-slate-400 block">Active Consistency</span>
+                <span className="text-xl sm:text-2xl font-bold font-mono text-amber-500">{currentStreak} Days</span>
+                <span className="text-[10px] sm:text-[11px] text-slate-400 block mt-0.5">Continuous Streak</span>
               </div>
             </div>
 
-            <div className={`p-5 rounded-2xl border space-y-3 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
+            <div className={`p-4 sm:p-5 rounded-2xl border space-y-3 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
               <h3 className="font-bold text-sm">Where My Time Went by Activity Tag</h3>
               {reviewMetrics.tagBars.length === 0 ? (
                 <p className="text-xs text-slate-400 py-4">No hours logged yet in this period.</p>
@@ -2182,7 +2352,7 @@ export default function App() {
               )}
             </div>
 
-            <div className={`p-5 rounded-2xl border space-y-3 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
+            <div className={`p-4 sm:p-5 rounded-2xl border space-y-3 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
               <div className="flex justify-between items-center">
                 <h3 className="font-bold text-sm flex items-center gap-1.5">
                   <BookOpen className="h-4 w-4 text-indigo-500" /> My Baseline Roles & Responsibilities (KRAs)
@@ -2220,13 +2390,13 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= TAB 4: COMPANY MASTER VIEW ================= */}
+        {/* TAB 4: COMPANY MASTER VIEW */}
         {activeTab === "company_master" && (
-          <div className="space-y-5">
-            <div className={`p-5 rounded-2xl border shadow-sm space-y-4 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+          <div className="space-y-4 sm:space-y-5">
+            <div className={`p-4 sm:p-5 rounded-2xl border shadow-sm space-y-4 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3 border-slate-200/50">
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Rocket className="h-4 w-4 text-indigo-500" />
                     <h3 className="font-bold text-sm">Weekly Team Launch Tower</h3>
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-indigo-500/10 text-indigo-500">
@@ -2235,7 +2405,7 @@ export default function App() {
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5">
                     Height this week: <strong className="text-indigo-500 font-mono">{towerData.currentWkPoints} GP</strong>
-                    {" "}({towerData.delta >= 0 ? `▲ +${towerData.delta} GP vs last week` : `▼ ${towerData.delta} GP vs last week`})
+                    {" "}({towerData.delta >= 0 ? `▲ +${towerData.delta} GP vs last wk` : `▼ ${towerData.delta} GP vs last wk`})
                   </p>
                 </div>
                 <div className="text-left sm:text-right text-xs">
@@ -2244,7 +2414,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-4 gap-3 items-end pt-2 h-36">
+              <div className="grid grid-cols-4 gap-3 items-end pt-2 h-32 sm:h-36">
                 {towerData.historyBars.map(bar => (
                   <div key={bar.weekMon} className="flex flex-col items-center gap-1.5 h-full justify-end">
                     <span className="text-[11px] font-mono font-bold">{bar.points} GP</span>
@@ -2257,76 +2427,70 @@ export default function App() {
               </div>
             </div>
 
-            <div className={`p-3 rounded-2xl border flex flex-wrap items-center justify-between gap-3 text-xs ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className={`flex p-0.5 rounded-lg border ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"}`}>
+            <div className={`p-3 rounded-2xl border flex flex-wrap items-center justify-between gap-2 text-xs ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
+              <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+                <div className={`flex p-0.5 rounded-lg border w-full sm:w-auto justify-between ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"}`}>
                   <button
                     type="button"
                     onClick={() => setCompanyMasterMode("ROADMAP")}
-                    className={`px-3 py-1.5 rounded-md font-semibold transition flex items-center gap-1.5 ${
+                    className={`flex-1 sm:flex-none px-2.5 py-1.5 rounded-md font-semibold transition flex items-center justify-center gap-1 ${
                       companyMasterMode === "ROADMAP"
                         ? "bg-indigo-600 text-white shadow-sm"
                         : "text-slate-400"
                     }`}
                   >
-                    <ListChecks className="h-3.5 w-3.5" /> Deliverables & Due Variance
+                    <ListChecks className="h-3.5 w-3.5" /> Deliverables
                   </button>
                   <button
                     type="button"
                     onClick={() => setCompanyMasterMode("TIMESHEET")}
-                    className={`px-3 py-1.5 rounded-md font-semibold transition flex items-center gap-1.5 ${
+                    className={`flex-1 sm:flex-none px-2.5 py-1.5 rounded-md font-semibold transition flex items-center justify-center gap-1 ${
                       companyMasterMode === "TIMESHEET"
                         ? "bg-indigo-600 text-white shadow-sm"
                         : "text-slate-400"
                     }`}
                   >
-                    <Calendar className="h-3.5 w-3.5" /> Weekly Day Matrix
+                    <Calendar className="h-3.5 w-3.5" /> Day Matrix
                   </button>
                   <button
                     type="button"
                     onClick={() => setCompanyMasterMode("DAILY_LOGS")}
-                    className={`px-3 py-1.5 rounded-md font-semibold transition flex items-center gap-1.5 ${
+                    className={`flex-1 sm:flex-none px-2.5 py-1.5 rounded-md font-semibold transition flex items-center justify-center gap-1 ${
                       companyMasterMode === "DAILY_LOGS"
                         ? "bg-indigo-600 text-white shadow-sm"
                         : "text-slate-400"
                     }`}
                   >
-                    <Eye className="h-3.5 w-3.5" /> All Activity Feed
+                    <Eye className="h-3.5 w-3.5" /> Activity Feed
                   </button>
                 </div>
 
-                <select
-                  value={companyFilterMember}
-                  onChange={(e) => setCompanyFilterMember(e.target.value)}
-                  className={`px-2.5 py-1.5 rounded-lg border font-medium ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"}`}
-                >
-                  <option value="ALL">All Team Members</option>
-                  {employees.map(emp => <option key={emp.Email} value={emp.Email}>{emp.Name || emp.Email}</option>)}
-                </select>
+                <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto">
+                  <select
+                    value={companyFilterMember}
+                    onChange={(e) => setCompanyFilterMember(e.target.value)}
+                    className={`px-2.5 py-1.5 rounded-lg border font-medium ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"}`}
+                  >
+                    <option value="ALL">All Members</option>
+                    {employees.map(emp => <option key={emp.Email} value={emp.Email}>{emp.Name || emp.Email}</option>)}
+                  </select>
 
-                <select
-                  value={companyFilterTag}
-                  onChange={(e) => setCompanyFilterTag(e.target.value)}
-                  className={`px-2.5 py-1.5 rounded-lg border font-medium ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"}`}
-                >
-                  <option value="ALL">All Activity Tags</option>
-                  {tags.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+                  <select
+                    value={companyFilterTag}
+                    onChange={(e) => setCompanyFilterTag(e.target.value)}
+                    className={`px-2.5 py-1.5 rounded-lg border font-medium ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"}`}
+                  >
+                    <option value="ALL">All Tags</option>
+                    {tags.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
               </div>
-
-              <span className="text-slate-400">
-                {companyMasterMode === "TIMESHEET" 
-                  ? "Mon–Sat exact hours per day" 
-                  : companyMasterMode === "DAILY_LOGS"
-                  ? `Showing ${allEmployeesDailyLogFeed.length} logged sessions`
-                  : "Target Date vs. Actual Completion Date"}
-              </span>
             </div>
 
             {companyMasterMode === "ROADMAP" && (
               <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                  <table className="w-full text-left border-collapse text-xs sm:text-sm min-w-[700px]">
                     <thead>
                       <tr className={`border-b text-[11px] uppercase font-semibold ${isDark ? "bg-slate-950/60 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
                         <th className="py-3 px-4">Deliverable / Visit</th>
@@ -2334,7 +2498,7 @@ export default function App() {
                         <th className="py-3 px-3">Tag</th>
                         <th className="py-3 px-3">Owner(s)</th>
                         <th className="py-3 px-3">Target Date</th>
-                        <th className="py-3 px-3">Completed Date & SLA</th>
+                        <th className="py-3 px-3">Completed & SLA</th>
                         <th className="py-3 px-3 w-32">Progress</th>
                         <th className="py-3 px-4 text-right">Effort</th>
                       </tr>
@@ -2476,7 +2640,7 @@ export default function App() {
             {companyMasterMode === "TIMESHEET" && (
               <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                  <table className="w-full text-left border-collapse text-xs sm:text-sm min-w-[650px]">
                     <thead>
                       <tr className={`border-b text-[11px] uppercase font-semibold ${isDark ? "bg-slate-950/60 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
                         <th className="py-3 px-4">Deliverable / Activity</th>
@@ -2536,7 +2700,7 @@ export default function App() {
             {companyMasterMode === "DAILY_LOGS" && (
               <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                  <table className="w-full text-left border-collapse text-xs sm:text-sm min-w-[600px]">
                     <thead>
                       <tr className={`border-b text-[11px] uppercase font-semibold ${isDark ? "bg-slate-950/60 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
                         <th className="py-3 px-4">Date</th>
@@ -2588,7 +2752,6 @@ export default function App() {
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteActivityLog(log)}
-                                  title="Delete mistaken log entry"
                                   className="text-slate-400 hover:text-rose-500 p-1"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
@@ -2607,7 +2770,48 @@ export default function App() {
         )}
       </main>
 
-      {/* ================= RESCHEDULE TARGET DATE MODAL ================= */}
+      {/* MOBILE BOTTOM NAVIGATION BAR */}
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 border-t z-40 px-2 py-1.5 backdrop-blur-lg ${isDark ? "bg-slate-900/95 border-slate-800" : "bg-white/95 border-slate-200"}`}>
+        <div className="grid grid-cols-4 gap-1 text-[10px] font-semibold">
+          <button
+            type="button"
+            onClick={() => setActiveTab("my_tasks")}
+            className={`flex flex-col items-center justify-center py-1 rounded-xl transition ${activeTab === "my_tasks" ? "text-indigo-500 bg-indigo-500/10" : "text-slate-400"}`}
+          >
+            <ListChecks className="h-4 w-4 mb-0.5" />
+            <span>Tasks ({activeTasks.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("learning")}
+            className={`flex flex-col items-center justify-center py-1 rounded-xl transition ${activeTab === "learning" ? "text-indigo-500 bg-indigo-500/10" : "text-slate-400"}`}
+          >
+            <GraduationCap className="h-4 w-4 mb-0.5" />
+            <span>Learn ({activeLearningItems.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("monthly_review")}
+            className={`flex flex-col items-center justify-center py-1 rounded-xl transition ${activeTab === "monthly_review" ? "text-indigo-500 bg-indigo-500/10" : "text-slate-400"}`}
+          >
+            <BarChart3 className="h-4 w-4 mb-0.5" />
+            <span>Review</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("company_master")}
+            className={`flex flex-col items-center justify-center py-1 rounded-xl transition ${activeTab === "company_master" ? "text-indigo-500 bg-indigo-500/10" : "text-slate-400"}`}
+          >
+            <Building2 className="h-4 w-4 mb-0.5" />
+            <span>Company</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* RESCHEDULE TARGET DATE MODAL */}
       {rescheduleTarget && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className={`border rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4 text-xs ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
@@ -2652,7 +2856,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ================= TAGS & PROJECTS MANAGER DRAWER ================= */}
+      {/* TAGS & PROJECTS MANAGER DRAWER */}
       {showLibraryManager && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className={`border rounded-2xl max-w-lg w-full p-5 shadow-2xl space-y-5 text-xs max-h-[85vh] overflow-y-auto ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
@@ -2769,7 +2973,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ================= GUARDED COMPLETION MODAL ================= */}
+      {/* GUARDED COMPLETION MODAL */}
       {completionGuardTarget && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className={`border rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4 ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
@@ -2827,7 +3031,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ================= PERSONAL GP LEDGER MODAL ================= */}
+      {/* PERSONAL GP LEDGER MODAL */}
       {showGpModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className={`border rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4 text-xs ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
@@ -2867,7 +3071,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ================= STREAK MODAL ================= */}
+      {/* STREAK MODAL */}
       {showStreakModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className={`border rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4 text-xs ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
@@ -2917,7 +3121,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ================= ONBOARD MEMBER MODAL ================= */}
+      {/* ONBOARD MEMBER MODAL */}
       {showEmpModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className={`border rounded-2xl max-w-md w-full p-5 shadow-xl space-y-3 text-xs ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
