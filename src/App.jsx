@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Flame, CheckCircle, Clock, BookOpen, Building2, 
-  RefreshCw, FolderPlus, UserPlus, CalendarCheck, 
+  RefreshCw, FolderPlus, UserPlus, 
   GraduationCap, Plus, Trash2, BarChart3, Users, 
   Edit3, Rocket, Check, X, Sun, Moon, Table, 
   CheckSquare, Square, ChevronRight, ChevronDown, 
-  AlertCircle, ListChecks, Filter, Tag, Calendar, 
-  Award, TrendingUp, Settings, Sliders, MapPin, Eye
+  ListChecks, Tag, Calendar, 
+  Award, Settings, MapPin, Eye, Lock, Copy
 } from 'lucide-react';
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnW8cS7n3pusA4sHYN1NJOPHqKR38G4_qAa0VxnU-mKrFDsGjczS0TV5YFZoJaTtK-/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwkPorOfbnqoZp9IFIvSp2DEHwoN1V3vw5rlZFSsvQSJG16PkV3Kt6k9ywvBRSmvTWX/exec";
 
 const DEFAULT_PROJECTS = [
   { Project_ID: "PRJ-DEXTER", Project_Name: "Dexter Box", Full_Name: "Dexter Box Science Kits" },
@@ -64,6 +64,13 @@ function getMondayOfDate(dStr) {
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   const mon = new Date(d.setDate(diff));
   return `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
+}
+
+function diffDaysBetween(dateA, dateB) {
+  if (!dateA || !dateB) return 0;
+  const a = new Date(dateA + "T00:00:00");
+  const b = new Date(dateB + "T00:00:00");
+  return Math.round((a - b) / (1000 * 60 * 60 * 24));
 }
 
 function mergeById(remoteArr, localArr, idKey) {
@@ -137,7 +144,6 @@ function getWeekDates(mondayStr) {
   return days;
 }
 
-// Searchable Auto-complete Combobox
 function SearchableTagCombobox({ value, onChange, availableTags, onAddNewTag, isDark, placeholder = "Tag..." }) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -247,7 +253,6 @@ export default function App() {
 
   useEffect(() => { localStorage.setItem("ie_theme", theme); }, [theme]);
 
-  // Safe State Loading
   const [employees, setEmployees] = useState(() => safeLoadJson("ie_v3_employees", []));
   const [projects, setProjects] = useState(() => mergeById(safeLoadJson("ie_v3_projects", []), DEFAULT_PROJECTS, "Project_ID"));
   const [tags, setTags] = useState(() => safeLoadJson("ie_v8_tags", DEFAULT_TAGS));
@@ -271,11 +276,20 @@ export default function App() {
   const [newLearningTopic, setNewLearningTopic] = useState("");
   const [newLearningTag, setNewLearningTag] = useState("#R&D");
 
-  // Expanded Rows & Drawers
+  // Expanded Rows, Inline Editors & Delete Confirmations
   const [expandedRowIds, setExpandedRowIds] = useState({});
   const [newSubtaskInputs, setNewSubtaskInputs] = useState({});
+  const [editingTitleId, setEditingTitleId] = useState(null);
+  const [editingTitleDraft, setEditingTitleDraft] = useState("");
+  const [coOwnerPopoverId, setCoOwnerPopoverId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [showCompletedRows, setShowCompletedRows] = useState(false);
   const [showCompletedLearning, setShowCompletedLearning] = useState(false);
+
+  // Target Date Reschedule Modal
+  const [rescheduleTarget, setRescheduleTarget] = useState(null);
+  const [rescheduleNewDate, setRescheduleNewDate] = useState("");
+  const [rescheduleReason, setRescheduleReason] = useState("");
 
   // Guarded Completion
   const [completionGuardTarget, setCompletionGuardTarget] = useState(null);
@@ -299,7 +313,7 @@ export default function App() {
   const [rnrDraft, setRnrDraft] = useState("");
 
   // Company Master View Modes
-  const [companyMasterMode, setCompanyMasterMode] = useState("TIMESHEET"); // 'TIMESHEET' | 'ROADMAP' | 'DAILY_LOGS'
+  const [companyMasterMode, setCompanyMasterMode] = useState("ROADMAP");
   const [companyFilterProject, setCompanyFilterProject] = useState("ALL");
   const [companyFilterMember, setCompanyFilterMember] = useState("ALL");
   const [companyFilterTag, setCompanyFilterTag] = useState("ALL");
@@ -321,21 +335,34 @@ export default function App() {
   useEffect(() => {
     if (activeEmployeeEmail) {
       localStorage.setItem("ie_v3_active_emp", activeEmployeeEmail);
-      if (selectedCollaborators.length === 0) setSelectedCollaborators([activeEmployeeEmail]);
+      setSelectedCollaborators([activeEmployeeEmail]);
     }
   }, [activeEmployeeEmail]);
 
-  const fetchSheetData = async () => {
-    setIsLoading(true);
+  const fetchSheetData = async (silent = false) => {
+    if (!silent) setIsLoading(true);
     try {
-      const res = await fetch(`${APPS_SCRIPT_URL}?action=getBootstrapData`);
+      const res = await fetch(`${APPS_SCRIPT_URL}?action=getBootstrapData&t=${Date.now()}`);
       const data = await res.json();
       if (data && data.status === "success") {
-        if (data.employees && data.employees.length > 0) {
-          const cleanEmps = data.employees.filter(e => e && e.Email);
-          setEmployees(prev => mergeById(cleanEmps, prev, "Email"));
-          if (!activeEmployeeEmail && cleanEmps[0]) setActiveEmployeeEmail(cleanEmps[0].Email);
+        const remoteEmps = (data.employees || []).filter(e => e && e.Email);
+
+        const discoveredMap = new Map();
+        remoteEmps.forEach(e => discoveredMap.set(e.Email.toLowerCase().trim(), e));
+        (data.weeklyPulses || []).forEach(p => {
+          const em = (p?.Emp_Email || "").toLowerCase().trim();
+          if (em && !discoveredMap.has(em)) {
+            const guessedName = em.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+            discoveredMap.set(em, { Emp_ID: "IE-AUTO", Name: guessedName, Email: em, Role_Title: "Team Member", Department: "IE Skool", Level: "L3", Status: "Active" });
+          }
+        });
+
+        const mergedEmployees = mergeById(Array.from(discoveredMap.values()), employees, "Email");
+        setEmployees(mergedEmployees);
+        if (!activeEmployeeEmail && mergedEmployees[0]) {
+          setActiveEmployeeEmail(mergedEmployees[0].Email);
         }
+
         if (data.projects && data.projects.length > 0) {
           setProjects(prev => mergeById(data.projects, prev, "Project_ID"));
         }
@@ -344,25 +371,29 @@ export default function App() {
           if (remoteTags.length > 0) setTags(prev => Array.from(new Set([...prev, ...remoteTags])));
         }
         if (data.weeklyPulses) {
-          setWeeklyPulses(prev => {
-            const remoteMap = new Map();
-            data.weeklyPulses.forEach(p => { if (p && p.Pulse_ID) remoteMap.set(p.Pulse_ID, p); });
-            prev.forEach(localP => { if (localP && localP.Pulse_ID && !remoteMap.has(localP.Pulse_ID)) remoteMap.set(localP.Pulse_ID, localP); });
-            return Array.from(remoteMap.values());
-          });
+          setWeeklyPulses(data.weeklyPulses.filter(p => p && p.Pulse_ID));
         }
         if (data.dailyLogs) {
-          setDailyLogs(prev => mergeById(data.dailyLogs, prev, "Log_ID"));
+          setDailyLogs(data.dailyLogs.filter(l => l && l.Log_ID));
         }
       }
     } catch (err) {
-      console.log("Using cached state:", err);
+      console.log("Sync notice:", err);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   };
 
-  useEffect(() => { fetchSheetData(); }, []);
+  useEffect(() => {
+    fetchSheetData(false);
+    const interval = setInterval(() => fetchSheetData(true), 30000);
+    const onFocus = () => fetchSheetData(true);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
 
   const currentEmp = useMemo(() => {
     const found = employees.find(e => e && e.Email && (e.Email || "").toLowerCase() === (activeEmployeeEmail || "").toLowerCase());
@@ -402,7 +433,7 @@ export default function App() {
   const getEmployeeName = (email) => {
     if (!email) return "Member";
     const found = employees.find(e => e && e.Email && e.Email.toLowerCase() === email.toLowerCase().trim());
-    return found ? found.Name : email;
+    return found ? found.Name : email.split("@")[0];
   };
 
   const handleAddNewTagOnTheFly = (newTag) => {
@@ -421,7 +452,6 @@ export default function App() {
     }
   };
 
-  // Personal GP Ledger
   const personalGpData = useMemo(() => {
     let totalGp = 0;
     const history = [];
@@ -458,7 +488,6 @@ export default function App() {
     return { totalGp, history: history.slice(0, 15) };
   }, [completedTasks, empDailyLogs, todayStr]);
 
-  // Weekly Tower Record
   const towerData = useMemo(() => {
     const weeklyPointsMap = {};
 
@@ -523,7 +552,6 @@ export default function App() {
     };
   }, [weeklyPulses, dailyLogs, currentMondayStr, todayStr]);
 
-  // Company Master Tasks Aggregation
   const companyMasterTasks = useMemo(() => {
     const groupedMap = new Map();
 
@@ -533,6 +561,7 @@ export default function App() {
       const mins = Number(p.Auto_Learning_Hours || 0);
       const prog = Number(p.Auto_Task_Hours || 0);
       const subtasks = parseSubtasks(p);
+      const outcomeNote = (p.Friday_Outcome && !["DELIVERABLE", "EVENT", "Self", "LEARNING"].includes(p.Friday_Outcome)) ? p.Friday_Outcome : "";
 
       if (!existing) {
         groupedMap.set(key, {
@@ -544,6 +573,7 @@ export default function App() {
           createdDate: normalizeDateStr(p.Created_Date || p.Week_Start_Date) || todayStr,
           targetDeadline: normalizeDateStr(p.Target_Deadline),
           completedDate: normalizeDateStr(p.Completed_Date),
+          outcomeNote: outcomeNote,
           owners: [p.Emp_Email].filter(Boolean),
           totalMinutes: mins,
           progress: prog,
@@ -553,6 +583,8 @@ export default function App() {
         if (p.Emp_Email && !existing.owners.includes(p.Emp_Email)) existing.owners.push(p.Emp_Email);
         existing.totalMinutes += mins;
         existing.progress = Math.max(existing.progress, prog);
+        if (p.Completed_Date) existing.completedDate = normalizeDateStr(p.Completed_Date);
+        if (outcomeNote) existing.outcomeNote = outcomeNote;
         if (subtasks.length > existing.subtasks.length) existing.subtasks = subtasks;
       }
     });
@@ -569,7 +601,6 @@ export default function App() {
     });
   }, [companyMasterTasks, companyFilterProject, companyFilterMember, companyFilterTag]);
 
-  // Date-Wise Weekly Timesheet Matrix
   const computeTimesheetMatrix = (logsSubset, tasksSubset) => {
     const matrixRows = [];
 
@@ -616,13 +647,11 @@ export default function App() {
     return matrixRows;
   };
 
-  // Safe Personal Matrix (Guarded to prevent white screen)
   const personalTimesheetMatrix = useMemo(() => {
     try {
       const currentWeekLogs = empDailyLogs.filter(l => normalizeDateStr(l.Date) >= currentMondayStr);
       return computeTimesheetMatrix(currentWeekLogs, empAllPulses);
     } catch (e) {
-      console.warn("Timesheet computation error:", e);
       return [];
     }
   }, [empDailyLogs, currentMondayStr, empAllPulses, weekDays]);
@@ -642,7 +671,6 @@ export default function App() {
     }
   }, [dailyLogs, currentMondayStr, companyFilterMember, companyFilterTag, companyMasterTasks, weekDays]);
 
-  // Live Date-by-Date Log Ledger (Requested: Who worked on What Date and What Task)
   const allEmployeesDailyLogFeed = useMemo(() => {
     return (dailyLogs || []).filter(l => {
       if (!l) return false;
@@ -652,7 +680,6 @@ export default function App() {
     }).slice().reverse();
   }, [dailyLogs, companyFilterMember, companyFilterTag]);
 
-  // Safe Monthly Review Metrics
   const reviewMetrics = useMemo(() => {
     const currentMonthPrefix = todayStr.slice(0, 7);
     const periodLogs = empDailyLogs.filter(l => {
@@ -700,7 +727,6 @@ export default function App() {
     };
   }, [empDailyLogs, reviewPeriod, currentMondayStr, todayStr, empAllPulses, completedTasks]);
 
-  // Subtask Sync
   const syncSubtasksAndProgress = (rowItem, updatedSubtasks) => {
     const totalSub = updatedSubtasks.length;
     const doneSub = updatedSubtasks.filter(s => s.done).length;
@@ -766,7 +792,153 @@ export default function App() {
     syncSubtasksAndProgress(rowItem, updated);
   };
 
-  // 1-Tap Time Logging with Explicit Date Record
+  // Duplicate / Copy Task Row (Restored Copy Symbol Action!)
+  const handleDuplicateTaskRow = (rowItem) => {
+    const copiedSubtasks = parseSubtasks(rowItem).map((s, idx) => ({
+      ...s,
+      id: `SUB-${Date.now()}-${idx}`,
+      done: false
+    }));
+
+    const duplicated = {
+      ...rowItem,
+      Pulse_ID: `TSK-${Date.now()}-CPY`,
+      Created_Date: todayStr,
+      Monday_Commitment: `${rowItem.Monday_Commitment} (Copy)`,
+      Auto_Task_Hours: 0,
+      Auto_Learning_Hours: 0,
+      Status: "In Progress",
+      Target_Deadline: todayStr,
+      Completed_Date: "",
+      Subtasks_JSON: JSON.stringify(copiedSubtasks),
+      subtasks: copiedSubtasks
+    };
+
+    setWeeklyPulses(prev => [duplicated, ...prev]);
+    showToast(`Copied "${rowItem.Monday_Commitment}"!`);
+
+    try {
+      fetch(APPS_SCRIPT_URL, {
+        method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: "addWorkboardBatch", items: [duplicated] })
+      });
+    } catch (err) {}
+  };
+
+  // Delete Task Row
+  const handleDeleteTaskRow = (rowItem) => {
+    setWeeklyPulses(prev => prev.filter(p => p.Pulse_ID !== rowItem.Pulse_ID));
+    setConfirmDeleteId(null);
+    showToast(`Deleted "${rowItem.Monday_Commitment}"`);
+
+    try {
+      fetch(APPS_SCRIPT_URL, {
+        method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: "deleteTaskRow", pulseId: rowItem.Pulse_ID })
+      });
+    } catch (err) {}
+  };
+
+  // Delete Mistaken Activity Log Entry
+  const handleDeleteActivityLog = (logItem) => {
+    setDailyLogs(prev => prev.filter(l => l.Log_ID !== logItem.Log_ID));
+    showToast("Removed activity log entry!");
+
+    try {
+      fetch(APPS_SCRIPT_URL, {
+        method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: "deleteDailyLog", logId: logItem.Log_ID })
+      });
+    } catch (err) {}
+  };
+
+  // Toggle Co-Owners on an Existing Task
+  const handleToggleTaskCoOwner = (rowItem, targetEmail) => {
+    const currentCollabs = (rowItem.Collaborators || rowItem.Emp_Email || "")
+      .split(",")
+      .map(s => s.trim().toLowerCase())
+      .filter(Boolean);
+
+    const exists = currentCollabs.includes(targetEmail.toLowerCase());
+    if (exists && currentCollabs.length <= 1) {
+      showToast("A task must have at least one owner.");
+      return;
+    }
+
+    const updatedCollabs = exists
+      ? currentCollabs.filter(e => e !== targetEmail.toLowerCase())
+      : [...currentCollabs, targetEmail.toLowerCase()];
+
+    const collabStr = updatedCollabs.join(", ");
+
+    setWeeklyPulses(prev => prev.map(p => p.Pulse_ID === rowItem.Pulse_ID ? { ...p, Collaborators: collabStr } : p));
+
+    try {
+      fetch(APPS_SCRIPT_URL, {
+        method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: "updateRowField", pulseId: rowItem.Pulse_ID, collaborators: collabStr })
+      });
+    } catch (err) {}
+
+    if (!exists) {
+      const alreadyHasRow = weeklyPulses.some(
+        p => (p.Emp_Email || "").toLowerCase() === targetEmail.toLowerCase() &&
+             (p.Monday_Commitment || "").trim().toLowerCase() === (rowItem.Monday_Commitment || "").trim().toLowerCase()
+      );
+      if (!alreadyHasRow) {
+        const clonedRow = {
+          ...rowItem,
+          Pulse_ID: `TSK-${Date.now()}-CO`,
+          Emp_Email: targetEmail.toLowerCase(),
+          Auto_Learning_Hours: 0,
+          Collaborators: collabStr
+        };
+        setWeeklyPulses(prev => [...prev, clonedRow]);
+        try {
+          fetch(APPS_SCRIPT_URL, {
+            method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({ action: "addWorkboardBatch", items: [clonedRow] })
+          });
+        } catch (err) {}
+      }
+      showToast(`Added ${getEmployeeName(targetEmail)} as Co-Owner!`);
+    } else {
+      showToast(`Removed ${getEmployeeName(targetEmail)} from task.`);
+    }
+  };
+
+  // Reschedule Target Date
+  const handleConfirmReschedule = (e) => {
+    e.preventDefault();
+    if (!rescheduleTarget || !rescheduleNewDate || !rescheduleReason.trim()) return;
+
+    const oldDate = normalizeDateStr(rescheduleTarget.Target_Deadline) || todayStr;
+    const auditTrail = `Rescheduled from ${oldDate}: ${rescheduleReason.trim()}`;
+
+    setWeeklyPulses(prev => prev.map(p => p.Pulse_ID === rescheduleTarget.Pulse_ID ? {
+      ...p,
+      Target_Deadline: rescheduleNewDate,
+      Friday_Outcome: auditTrail
+    } : p));
+
+    try {
+      fetch(APPS_SCRIPT_URL, {
+        method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          action: "updateRowField",
+          pulseId: rescheduleTarget.Pulse_ID,
+          deadline: rescheduleNewDate,
+          outcomeNote: auditTrail
+        })
+      });
+    } catch (err) {}
+
+    showToast(`Target date updated with reason logged.`);
+    setRescheduleTarget(null);
+    setRescheduleReason("");
+  };
+
+  // 1-Tap Time Logging
   const handleQuickLogTimeOnRow = (rowItem, addMinutes, forceDone = false) => {
     const isLearning = rowItem.Project_ID === "UPSKILLING";
     const currentMins = Number(rowItem.Auto_Learning_Hours || 0) + addMinutes;
@@ -852,6 +1024,7 @@ export default function App() {
 
   const handleUpdateRowAttribute = (pulseId, field, value) => {
     setWeeklyPulses(prev => prev.map(p => p.Pulse_ID === pulseId ? { ...p, [field]: value } : p));
+    setEditingTitleId(null);
     showToast("Updated!");
 
     try {
@@ -866,7 +1039,7 @@ export default function App() {
     } catch (err) {}
   };
 
-  // Add Task Row Submit
+  // Create Task Row
   const handleCreateTaskRow = (e) => {
     e.preventDefault();
     if (!quickTitle.trim()) return;
@@ -890,7 +1063,7 @@ export default function App() {
       Monday_Commitment: quickTitle.trim(),
       Auto_Task_Hours: 0,
       Auto_Learning_Hours: 0,
-      Friday_Outcome: quickTag === "#SchoolVisit" ? "EVENT" : "DELIVERABLE",
+      Friday_Outcome: "DELIVERABLE",
       Status: "In Progress",
       Target_Deadline: quickDeadline || todayStr,
       Completed_Date: "",
@@ -952,6 +1125,7 @@ export default function App() {
     } catch (err) {}
   };
 
+  // Tag & Project Management
   const handleAddNewTag = () => {
     let t = newTagInput.trim();
     if (!t) return;
@@ -1023,7 +1197,7 @@ export default function App() {
     } catch (err) {}
   };
 
-  // Fixed Onboard Member (No tab duplication, no white screen)
+  // Safe Add Employee Submit
   const handleAddEmployeeSubmit = (e) => {
     e.preventDefault();
     const cleanEmail = (newEmp.email || "").toLowerCase().trim();
@@ -1051,7 +1225,15 @@ export default function App() {
     try {
       fetch(APPS_SCRIPT_URL, {
         method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({ action: "addEmployee", ...entry })
+        body: JSON.stringify({
+          action: "addEmployee",
+          name: entry.Name,
+          email: entry.Email,
+          roleTitle: entry.Role_Title,
+          department: entry.Department,
+          level: entry.Level,
+          rnrSummary: entry["R&R_Summary"]
+        })
       });
     } catch (err) {}
   };
@@ -1075,7 +1257,6 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Clickable Goal Points Pill */}
             <button
               type="button"
               onClick={() => setShowGpModal(true)}
@@ -1086,7 +1267,6 @@ export default function App() {
               <span>{personalGpData.totalGp} GP</span>
             </button>
 
-            {/* Clickable Streak Pill */}
             <button
               type="button"
               onClick={() => setShowStreakModal(true)}
@@ -1097,7 +1277,6 @@ export default function App() {
               <span>{currentStreak}d Streak</span>
             </button>
 
-            {/* User Switcher */}
             {employees.length > 0 && (
               <select
                 value={activeEmployeeEmail}
@@ -1110,7 +1289,6 @@ export default function App() {
               </select>
             )}
 
-            {/* Manage Tags & Projects */}
             <button
               type="button"
               onClick={() => setShowLibraryManager(true)}
@@ -1121,7 +1299,6 @@ export default function App() {
               <span className="hidden sm:inline">Tags & Projects</span>
             </button>
 
-            {/* Safe Onboard Member Trigger */}
             <button
               type="button"
               onClick={() => setShowEmpModal(true)}
@@ -1133,7 +1310,7 @@ export default function App() {
 
             <button
               type="button"
-              onClick={fetchSheetData}
+              onClick={() => fetchSheetData(false)}
               title="Sync with Google Sheet"
               className={`p-1.5 rounded-lg border ${isDark ? "bg-slate-800 border-slate-700 text-slate-300" : "bg-white border-slate-200 text-slate-500 hover:text-slate-900"}`}
             >
@@ -1217,7 +1394,7 @@ export default function App() {
         {/* ================= TAB 1: MY TASKS & SUB-TASKS ================= */}
         {activeTab === "my_tasks" && (
           <div className="space-y-4">
-            {/* Task Entry Bar (Single Unified Input) */}
+            {/* Task Entry Bar */}
             <form onSubmit={handleCreateTaskRow} className={`p-3.5 rounded-2xl border shadow-sm space-y-2.5 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                 <div className="sm:col-span-4">
@@ -1287,7 +1464,7 @@ export default function App() {
                       className="text-[11px] text-indigo-500 font-medium flex items-center gap-1 hover:underline"
                     >
                       <Users className="h-3.5 w-3.5" />
-                      <span>{selectedCollaborators.length > 1 ? `Assigned to ${selectedCollaborators.length} members` : "+ Assign Co-Owners / Facilitators"}</span>
+                      <span>{selectedCollaborators.length > 1 ? `Assigned to ${selectedCollaborators.length} members` : "+ Assign Co-Owners / Collaborators"}</span>
                     </button>
 
                     {showCollabPicker && employees.map(emp => {
@@ -1321,13 +1498,13 @@ export default function App() {
                   <thead>
                     <tr className={`border-b text-[11px] uppercase tracking-wider font-semibold ${isDark ? "bg-slate-950/60 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
                       <th className="py-3 px-3 w-10 text-center">Done</th>
-                      <th className="py-3 px-3">Deliverable / Visit (Click row to expand)</th>
+                      <th className="py-3 px-3">Deliverable & Co-Owners</th>
                       <th className="py-3 px-3 w-28">Project</th>
                       <th className="py-3 px-3 w-32">Activity Tag</th>
-                      <th className="py-3 px-3 w-28">Date</th>
-                      <th className="py-3 px-3 w-36">Progress</th>
-                      <th className="py-3 px-3 w-20 text-right">Logged</th>
-                      <th className="py-3 px-4 w-52 text-right">Log Effort</th>
+                      <th className="py-3 px-3 w-32">Target Date</th>
+                      <th className="py-3 px-3 w-32">Progress</th>
+                      <th className="py-3 px-3 w-16 text-right">Logged</th>
+                      <th className="py-3 px-4 w-60 text-right">Log Effort & Actions</th>
                     </tr>
                   </thead>
                   <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-200/70"}`}>
@@ -1351,6 +1528,8 @@ export default function App() {
                         const isToday = due === todayStr;
                         const isOverdue = due && due < todayStr;
                         const isExpanded = Boolean(expandedRowIds[row.Pulse_ID]);
+                        const collabList = (row.Collaborators || row.Emp_Email || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+                        const isCoOwnerPopoverOpen = coOwnerPopoverId === row.Pulse_ID;
 
                         return (
                           <React.Fragment key={row.Pulse_ID}>
@@ -1367,7 +1546,7 @@ export default function App() {
                               </td>
 
                               <td className="py-3 px-3 font-medium">
-                                <div className="flex items-center gap-1.5 flex-wrap">
+                                <div className="flex items-center gap-1.5 flex-wrap relative">
                                   <button
                                     type="button"
                                     onClick={() => setExpandedRowIds(prev => ({ ...prev, [row.Pulse_ID]: !isExpanded }))}
@@ -1378,7 +1557,27 @@ export default function App() {
 
                                   {isSchoolVisit && <MapPin className="h-3 w-3 text-indigo-500 shrink-0" />}
 
-                                  <span>{row.Monday_Commitment}</span>
+                                  {/* Inline Editable Title */}
+                                  {editingTitleId === row.Pulse_ID ? (
+                                    <input
+                                      autoFocus
+                                      type="text"
+                                      value={editingTitleDraft}
+                                      onChange={(e) => setEditingTitleDraft(e.target.value)}
+                                      onBlur={() => handleUpdateRowAttribute(row.Pulse_ID, "Monday_Commitment", editingTitleDraft)}
+                                      onKeyDown={(e) => { if (e.key === "Enter") handleUpdateRowAttribute(row.Pulse_ID, "Monday_Commitment", editingTitleDraft); }}
+                                      className={`px-2 py-0.5 rounded border text-xs ${isDark ? "bg-slate-950 border-slate-700 text-white" : "bg-white border-slate-300"}`}
+                                    />
+                                  ) : (
+                                    <span
+                                      onClick={() => { setEditingTitleId(row.Pulse_ID); setEditingTitleDraft(row.Monday_Commitment); }}
+                                      className="cursor-pointer hover:underline flex items-center gap-1 group"
+                                      title="Click to edit title"
+                                    >
+                                      <span>{row.Monday_Commitment}</span>
+                                      <Edit3 className="h-3 w-3 opacity-0 group-hover:opacity-60 text-indigo-400" />
+                                    </span>
+                                  )}
 
                                   {subtasks.length > 0 && (
                                     <span className={`px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold ${isDark ? "bg-slate-800 text-indigo-300" : "bg-slate-100 text-indigo-700"}`}>
@@ -1386,11 +1585,45 @@ export default function App() {
                                     </span>
                                   )}
 
-                                  {row.Collaborators && row.Collaborators.includes(",") && (
-                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-500 font-medium">
-                                      👥 Collab
-                                    </span>
-                                  )}
+                                  {/* Co-Owner Pill Button */}
+                                  <div className="relative inline-block">
+                                    <button
+                                      type="button"
+                                      onClick={() => setCoOwnerPopoverId(isCoOwnerPopoverOpen ? null : row.Pulse_ID)}
+                                      title="Click to assign or remove Co-Owners"
+                                      className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold flex items-center gap-1 transition cursor-pointer ${
+                                        collabList.length > 1
+                                          ? "bg-indigo-500/15 text-indigo-400 border-indigo-500/30"
+                                          : isDark ? "bg-slate-800 border-slate-700 text-slate-400 hover:text-white" : "bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200"
+                                      }`}
+                                    >
+                                      <Users className="h-2.5 w-2.5" />
+                                      <span>{collabList.length > 1 ? collabList.map(getEmployeeName).join(", ") : "+ Co-Owner"}</span>
+                                    </button>
+
+                                    {isCoOwnerPopoverOpen && (
+                                      <div className={`absolute left-0 top-full mt-1 w-48 rounded-xl border shadow-2xl p-2 z-50 text-xs space-y-1 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+                                        <div className="flex justify-between items-center pb-1 border-b border-slate-200/40">
+                                          <span className="font-bold text-[11px]">Assign Co-Owners</span>
+                                          <button type="button" onClick={() => setCoOwnerPopoverId(null)}><X className="h-3 w-3 text-slate-400" /></button>
+                                        </div>
+                                        {employees.map(emp => {
+                                          const isAssigned = collabList.includes(emp.Email.toLowerCase());
+                                          return (
+                                            <button
+                                              key={emp.Email}
+                                              type="button"
+                                              onClick={() => handleToggleTaskCoOwner(row, emp.Email)}
+                                              className={`w-full text-left px-2 py-1 rounded-lg flex items-center justify-between transition ${isAssigned ? "bg-indigo-600 text-white font-semibold" : isDark ? "hover:bg-slate-800 text-slate-300" : "hover:bg-slate-100 text-slate-700"}`}
+                                            >
+                                              <span>{emp.Name || emp.Email}</span>
+                                              {isAssigned && <Check className="h-3 w-3" />}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
 
                                   {isToday && (
                                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 font-semibold">
@@ -1426,18 +1659,30 @@ export default function App() {
                                 />
                               </td>
 
+                              {/* Locked Target Date */}
                               <td className="py-3 px-3 text-xs font-mono">
-                                <input
-                                  type="date"
-                                  value={due || todayStr}
-                                  onChange={(e) => handleUpdateRowAttribute(row.Pulse_ID, "Target_Deadline", e.target.value)}
-                                  className="bg-transparent text-xs font-mono border-b border-transparent hover:border-slate-400 focus:outline-none"
-                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRescheduleTarget(row);
+                                    setRescheduleNewDate(due || todayStr);
+                                    setRescheduleReason("");
+                                  }}
+                                  title="Target Date is locked — click to reschedule with a reason"
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-mono transition cursor-pointer ${
+                                    isOverdue
+                                      ? "border-rose-500/30 bg-rose-500/10 text-rose-400"
+                                      : isDark ? "border-slate-800 bg-slate-950 text-slate-300 hover:border-slate-700" : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                                  }`}
+                                >
+                                  <Lock className="h-2.5 w-2.5 opacity-60" />
+                                  <span>{due || todayStr}</span>
+                                </button>
                               </td>
 
                               <td className="py-3 px-3">
                                 <div className="flex items-center gap-2">
-                                  <div className={`w-16 h-2 rounded-full overflow-hidden ${isDark ? "bg-slate-800" : "bg-slate-200"}`}>
+                                  <div className={`w-14 h-2 rounded-full overflow-hidden ${isDark ? "bg-slate-800" : "bg-slate-200"}`}>
                                     <div className="bg-indigo-600 h-full transition-all duration-300" style={{ width: `${prog}%` }} />
                                   </div>
                                   <span className="text-xs font-mono font-bold text-indigo-500">{prog}%</span>
@@ -1448,59 +1693,83 @@ export default function App() {
                                 {(mins / 60).toFixed(1)}h
                               </td>
 
-                              {/* Action Buttons: Field Day (3h/6h) for Visits, 30m/1h for Office Tasks */}
+                              {/* Action Buttons + Copy Symbol + Delete */}
                               <td className="py-3 px-4 text-right">
-                                {isSchoolVisit ? (
-                                  <div className="inline-flex items-center gap-1">
+                                <div className="inline-flex items-center gap-1">
+                                  {isSchoolVisit ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleQuickLogTimeOnRow(row, 180, false)}
+                                        className={`px-2 py-1 rounded text-[11px] font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}
+                                      >
+                                        Half (3h)
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleQuickLogTimeOnRow(row, 360, false)}
+                                        className={`px-2 py-1 rounded text-[11px] font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}
+                                      >
+                                        Full (6h)
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleQuickLogTimeOnRow(row, 30, false)}
+                                        className={`px-2 py-1 rounded text-[11px] font-mono font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}
+                                      >
+                                        +30m
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleQuickLogTimeOnRow(row, 60, false)}
+                                        className={`px-2 py-1 rounded text-[11px] font-mono font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}
+                                      >
+                                        +1h
+                                      </button>
+                                    </>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleQuickLogTimeOnRow(row, 0, true)}
+                                    className="px-2 py-1 rounded text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition"
+                                  >
+                                    Done ✓
+                                  </button>
+
+                                  {/* Copy Task Symbol Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDuplicateTaskRow(row)}
+                                    title="Duplicate / Copy Task"
+                                    className="p-1 text-slate-400 hover:text-indigo-500 transition"
+                                  >
+                                    <Copy className="h-3.5 w-3.5" />
+                                  </button>
+
+                                  {/* Delete Row Button */}
+                                  {confirmDeleteId === row.Pulse_ID ? (
                                     <button
                                       type="button"
-                                      onClick={() => handleQuickLogTimeOnRow(row, 180, false)}
-                                      title="Log 3 Hours (Half Day School Visit)"
-                                      className={`px-2 py-1 rounded text-[11px] font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}
+                                      onClick={() => handleDeleteTaskRow(row)}
+                                      className="px-2 py-1 rounded text-[11px] font-bold bg-rose-600 text-white"
                                     >
-                                      Half (3h)
+                                      Delete?
                                     </button>
+                                  ) : (
                                     <button
                                       type="button"
-                                      onClick={() => handleQuickLogTimeOnRow(row, 360, false)}
-                                      title="Log 6 Hours (Full Day School Visit)"
-                                      className={`px-2 py-1 rounded text-[11px] font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}
+                                      onClick={() => setConfirmDeleteId(row.Pulse_ID)}
+                                      title="Delete Task"
+                                      className="p-1 text-slate-400 hover:text-rose-500 transition"
                                     >
-                                      Full (6h)
+                                      <Trash2 className="h-3.5 w-3.5" />
                                     </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleQuickLogTimeOnRow(row, 0, true)}
-                                      className="px-2 py-1 rounded text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition"
-                                    >
-                                      Done ✓
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div className="inline-flex items-center gap-1">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleQuickLogTimeOnRow(row, 30, false)}
-                                      className={`px-2 py-1 rounded text-[11px] font-mono font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}
-                                    >
-                                      +30m
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleQuickLogTimeOnRow(row, 60, false)}
-                                      className={`px-2 py-1 rounded text-[11px] font-mono font-semibold border transition ${isDark ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"}`}
-                                    >
-                                      +1h
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleQuickLogTimeOnRow(row, 0, true)}
-                                      className="px-2 py-1 rounded text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition"
-                                    >
-                                      Done ✓
-                                    </button>
-                                  </div>
-                                )}
+                                  )}
+                                </div>
                               </td>
                             </tr>
 
@@ -1598,9 +1867,27 @@ export default function App() {
                       {completedTasks.map(c => (
                         <div key={c.Pulse_ID} className="flex items-center justify-between py-1 text-slate-400">
                           <span className="line-through">{c.Monday_Commitment} ({getProjectLabel(c.Project_ID)}) • {c.Task_Code}</span>
-                          <span className="font-mono text-emerald-500 font-semibold">
-                            ✓ 100% Done ({(Number(c.Auto_Learning_Hours || 0) / 60).toFixed(1)}h)
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-emerald-500 font-semibold">
+                              ✓ 100% Done ({(Number(c.Auto_Learning_Hours || 0) / 60).toFixed(1)}h)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleDuplicateTaskRow(c)}
+                              title="Copy / Re-run Task"
+                              className="text-slate-400 hover:text-indigo-500"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTaskRow(c)}
+                              title="Delete Completed Row"
+                              className="text-slate-400 hover:text-rose-500"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1665,7 +1952,7 @@ export default function App() {
                     <th className="py-3 px-4">Skill / Topic Bucket</th>
                     <th className="py-3 px-3 w-32">Tag</th>
                     <th className="py-3 px-3 w-28 text-right">Logged Time</th>
-                    <th className="py-3 px-4 w-44 text-right">Log Practice Time</th>
+                    <th className="py-3 px-4 w-52 text-right">Log Practice Time</th>
                   </tr>
                 </thead>
                 <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-200/60"}`}>
@@ -1713,6 +2000,22 @@ export default function App() {
                                 className="px-2 py-1 rounded text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition"
                               >
                                 Done ✓
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDuplicateTaskRow(item)}
+                                title="Copy Learning Item"
+                                className="p-1 text-slate-400 hover:text-indigo-500"
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteTaskRow(item)}
+                                title="Delete Learning Item"
+                                className="p-1 text-slate-400 hover:text-rose-500"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </div>
                           </td>
@@ -1778,7 +2081,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* 1. DATE-WISE WEEKLY TIMESHEET MATRIX */}
             <div className={`p-5 rounded-2xl border shadow-sm space-y-3 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1841,7 +2143,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* KPI Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
               <div className={`p-4 rounded-2xl border ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
                 <span className="text-xs text-slate-400 block">Personal Goal Completion</span>
@@ -1868,7 +2169,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Time by Tag Breakdown */}
             <div className={`p-5 rounded-2xl border space-y-3 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
               <h3 className="font-bold text-sm">Where My Time Went by Activity Tag</h3>
               {reviewMetrics.tagBars.length === 0 ? (
@@ -1890,7 +2190,6 @@ export default function App() {
               )}
             </div>
 
-            {/* Monthly KRAs */}
             <div className={`p-5 rounded-2xl border space-y-3 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
               <div className="flex justify-between items-center">
                 <h3 className="font-bold text-sm flex items-center gap-1.5">
@@ -1954,7 +2253,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Weekly Comparison Chart */}
               <div className="grid grid-cols-4 gap-3 items-end pt-2 h-36">
                 {towerData.historyBars.map(bar => (
                   <div key={bar.weekMon} className="flex flex-col items-center gap-1.5 h-full justify-end">
@@ -1968,10 +2266,21 @@ export default function App() {
               </div>
             </div>
 
-            {/* Dynamic Filters & Modes (Timesheet / Deliverables / Date Ledger) */}
+            {/* Dynamic Filters & View Switcher */}
             <div className={`p-3 rounded-2xl border flex flex-wrap items-center justify-between gap-3 text-xs ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
               <div className="flex items-center gap-2 flex-wrap">
                 <div className={`flex p-0.5 rounded-lg border ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"}`}>
+                  <button
+                    type="button"
+                    onClick={() => setCompanyMasterMode("ROADMAP")}
+                    className={`px-3 py-1.5 rounded-md font-semibold transition flex items-center gap-1.5 ${
+                      companyMasterMode === "ROADMAP"
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : "text-slate-400"
+                    }`}
+                  >
+                    <ListChecks className="h-3.5 w-3.5" /> Deliverables & Due Variance
+                  </button>
                   <button
                     type="button"
                     onClick={() => setCompanyMasterMode("TIMESHEET")}
@@ -1982,17 +2291,6 @@ export default function App() {
                     }`}
                   >
                     <Calendar className="h-3.5 w-3.5" /> Weekly Day Matrix
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCompanyMasterMode("ROADMAP")}
-                    className={`px-3 py-1.5 rounded-md font-semibold transition flex items-center gap-1.5 ${
-                      companyMasterMode === "ROADMAP"
-                        ? "bg-indigo-600 text-white shadow-sm"
-                        : "text-slate-400"
-                    }`}
-                  >
-                    <ListChecks className="h-3.5 w-3.5" /> Deliverables
                   </button>
                   <button
                     type="button"
@@ -2031,11 +2329,162 @@ export default function App() {
                   ? "Mon–Sat exact hours per day" 
                   : companyMasterMode === "DAILY_LOGS"
                   ? `Showing ${allEmployeesDailyLogFeed.length} logged sessions`
-                  : "Deliverables & sub-tasks"}
+                  : "Target Date vs. Actual Completion Date"}
               </span>
             </div>
 
-            {/* 1. WEEKLY TIMESHEET MATRIX TABLE */}
+            {/* 1. DELIVERABLES & TARGET VS COMPLETION VARIANCE TABLE */}
+            {companyMasterMode === "ROADMAP" && (
+              <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                    <thead>
+                      <tr className={`border-b text-[11px] uppercase font-semibold ${isDark ? "bg-slate-950/60 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
+                        <th className="py-3 px-4">Deliverable / Visit</th>
+                        <th className="py-3 px-3">Project</th>
+                        <th className="py-3 px-3">Tag</th>
+                        <th className="py-3 px-3">Owner(s)</th>
+                        <th className="py-3 px-3">Target Date</th>
+                        <th className="py-3 px-3">Completed Date & SLA</th>
+                        <th className="py-3 px-3 w-32">Progress</th>
+                        <th className="py-3 px-4 text-right">Effort</th>
+                      </tr>
+                    </thead>
+                    <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-200/70"}`}>
+                      {filteredCompanyTasks.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" className="py-8 text-center text-slate-400 text-xs">
+                            No deliverables found matching the filter.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredCompanyTasks.map(item => {
+                          const isDone = item.progress >= 100;
+                          const doneSub = item.subtasks.filter(s => s.done).length;
+                          const isExp = Boolean(expandedMasterKeys[item.groupKey]);
+
+                          let slaBadge = null;
+                          if (isDone && item.completedDate && item.targetDeadline) {
+                            const delayDays = diffDaysBetween(item.completedDate, item.targetDeadline);
+                            if (delayDays <= 0) {
+                              slaBadge = <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-bold text-[10px]">⚡ On Time</span>;
+                            } else {
+                              slaBadge = <span className="px-2 py-0.5 rounded bg-amber-500/15 text-amber-400 font-bold text-[10px]">⚠️ {delayDays}d Late</span>;
+                            }
+                          } else if (!isDone && item.targetDeadline && item.targetDeadline < todayStr) {
+                            const overdueDays = diffDaysBetween(todayStr, item.targetDeadline);
+                            slaBadge = <span className="px-2 py-0.5 rounded bg-rose-500/15 text-rose-400 font-bold text-[10px]">🚨 {overdueDays}d Overdue</span>;
+                          } else {
+                            slaBadge = <span className="text-slate-400 text-[11px]">Active</span>;
+                          }
+
+                          return (
+                            <React.Fragment key={item.groupKey}>
+                              <tr
+                                onClick={() => setExpandedMasterKeys(prev => ({ ...prev, [item.groupKey]: !isExp }))}
+                                className={`cursor-pointer transition ${isDark ? "hover:bg-slate-800/40" : "hover:bg-slate-50/80"}`}
+                              >
+                                <td className="py-3 px-4 font-medium">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    {isExp ? <ChevronDown className="h-4 w-4 text-indigo-500" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+                                    <span className={isDone ? "line-through text-slate-400" : ""}>{item.title}</span>
+                                    {item.subtasks.length > 0 && (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-500/10 font-mono">
+                                        {doneSub}/{item.subtasks.length} ☑
+                                      </span>
+                                    )}
+                                  </div>
+                                  {item.outcomeNote && (
+                                    <span className="text-[10px] text-amber-500 block ml-5 mt-0.5">
+                                      📝 {item.outcomeNote}
+                                    </span>
+                                  )}
+                                </td>
+
+                                <td className="py-3 px-3">
+                                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? "bg-indigo-500/10 text-indigo-300" : "bg-indigo-50 text-indigo-700"}`}>
+                                    {getProjectLabel(item.projectId)}
+                                  </span>
+                                </td>
+
+                                <td className="py-3 px-3">
+                                  <span className="px-1.5 py-0.5 rounded bg-slate-500/10 text-[11px] font-medium">
+                                    {item.tag}
+                                  </span>
+                                </td>
+
+                                <td className="py-3 px-3 text-xs font-medium">
+                                  {item.owners.map(getEmployeeName).join(", ")}
+                                </td>
+
+                                <td className="py-3 px-3 font-mono text-xs text-slate-400">
+                                  {item.targetDeadline || "Rolling"}
+                                </td>
+
+                                <td className="py-3 px-3 text-xs">
+                                  <div className="flex flex-col gap-0.5">
+                                    {isDone && item.completedDate && (
+                                      <span className="font-mono text-[11px] text-slate-300">{item.completedDate}</span>
+                                    )}
+                                    <div>{slaBadge}</div>
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-3">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-14 h-2 rounded-full overflow-hidden ${isDark ? "bg-slate-800" : "bg-slate-200"}`}>
+                                      <div
+                                        className={`h-full ${isDone ? "bg-emerald-500" : "bg-indigo-600"}`}
+                                        style={{ width: `${item.progress}%` }}
+                                      />
+                                    </div>
+                                    <span className={`font-mono text-xs font-bold ${isDone ? "text-emerald-500" : "text-indigo-500"}`}>
+                                      {item.progress}%
+                                    </span>
+                                  </div>
+                                </td>
+
+                                <td className="py-3 px-4 text-right font-mono text-xs font-semibold">
+                                  {(item.totalMinutes / 60).toFixed(1)}h
+                                </td>
+                              </tr>
+
+                              {isExp && (
+                                <tr className={isDark ? "bg-slate-950/70" : "bg-slate-50"}>
+                                  <td colSpan="8" className="py-3 px-8">
+                                    {item.subtasks.length === 0 ? (
+                                      <p className="text-xs text-slate-400 italic">No sub-tasks defined for this deliverable.</p>
+                                    ) : (
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                        {item.subtasks.map((sub, idx) => (
+                                          <div
+                                            key={sub.id}
+                                            className={`px-3 py-1.5 rounded-lg border text-xs flex items-center gap-2 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}
+                                          >
+                                            <span className={sub.done ? "text-emerald-500 font-bold" : "text-slate-400"}>
+                                              {sub.done ? "☑" : "☐"}
+                                            </span>
+                                            <span className={sub.done ? "line-through text-slate-400" : ""}>
+                                              {idx + 1}. {sub.title}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 2. WEEKLY TIMESHEET MATRIX TABLE */}
             {companyMasterMode === "TIMESHEET" && (
               <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
                 <div className="overflow-x-auto">
@@ -2096,140 +2545,7 @@ export default function App() {
               </div>
             )}
 
-            {/* 2. DELIVERABLES ROADMAP TABLE */}
-            {companyMasterMode === "ROADMAP" && (
-              <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs sm:text-sm">
-                    <thead>
-                      <tr className={`border-b text-[11px] uppercase font-semibold ${isDark ? "bg-slate-950/60 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"}`}>
-                        <th className="py-3 px-4">Deliverable / Visit</th>
-                        <th className="py-3 px-3">Project</th>
-                        <th className="py-3 px-3">Tag</th>
-                        <th className="py-3 px-3">Owner(s)</th>
-                        <th className="py-3 px-3">Target Date</th>
-                        <th className="py-3 px-3">Sub-Tasks</th>
-                        <th className="py-3 px-3 w-36">Progress</th>
-                        <th className="py-3 px-4 text-right">Effort</th>
-                      </tr>
-                    </thead>
-                    <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-200/70"}`}>
-                      {filteredCompanyTasks.length === 0 ? (
-                        <tr>
-                          <td colSpan="8" className="py-8 text-center text-slate-400 text-xs">
-                            No deliverables found matching the filter.
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredCompanyTasks.map(item => {
-                          const isDone = item.progress >= 100;
-                          const isOverdue = !isDone && item.targetDeadline && item.targetDeadline < todayStr;
-                          const doneSub = item.subtasks.filter(s => s.done).length;
-                          const isExp = Boolean(expandedMasterKeys[item.groupKey]);
-
-                          return (
-                            <React.Fragment key={item.groupKey}>
-                              <tr
-                                onClick={() => setExpandedMasterKeys(prev => ({ ...prev, [item.groupKey]: !isExp }))}
-                                className={`cursor-pointer transition ${isDark ? "hover:bg-slate-800/40" : "hover:bg-slate-50/80"}`}
-                              >
-                                <td className="py-3 px-4 font-medium">
-                                  <div className="flex items-center gap-1.5">
-                                    {isExp ? <ChevronDown className="h-4 w-4 text-indigo-500" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
-                                    <span className={isDone ? "line-through text-slate-400" : ""}>{item.title}</span>
-                                    {isOverdue && (
-                                      <span className="px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-500 text-[10px] font-semibold">
-                                        Overdue
-                                      </span>
-                                    )}
-                                  </div>
-                                </td>
-
-                                <td className="py-3 px-3">
-                                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? "bg-indigo-500/10 text-indigo-300" : "bg-indigo-50 text-indigo-700"}`}>
-                                    {getProjectLabel(item.projectId)}
-                                  </span>
-                                </td>
-
-                                <td className="py-3 px-3">
-                                  <span className="px-1.5 py-0.5 rounded bg-slate-500/10 text-[11px] font-medium">
-                                    {item.tag}
-                                  </span>
-                                </td>
-
-                                <td className="py-3 px-3 text-xs">
-                                  {item.owners.map(getEmployeeName).join(", ")}
-                                </td>
-
-                                <td className="py-3 px-3 font-mono text-xs text-slate-400">
-                                  {item.targetDeadline || "Rolling"}
-                                </td>
-
-                                <td className="py-3 px-3 font-mono text-xs">
-                                  {item.subtasks.length > 0 ? (
-                                    <span className="px-2 py-0.5 rounded bg-slate-500/10 font-semibold">
-                                      {doneSub} / {item.subtasks.length} ☑
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-400">1-step</span>
-                                  )}
-                                </td>
-
-                                <td className="py-3 px-3">
-                                  <div className="flex items-center gap-2">
-                                    <div className={`w-16 h-2 rounded-full overflow-hidden ${isDark ? "bg-slate-800" : "bg-slate-200"}`}>
-                                      <div
-                                        className={`h-full ${isDone ? "bg-emerald-500" : "bg-indigo-600"}`}
-                                        style={{ width: `${item.progress}%` }}
-                                      />
-                                    </div>
-                                    <span className={`font-mono text-xs font-bold ${isDone ? "text-emerald-500" : "text-indigo-500"}`}>
-                                      {item.progress}%
-                                    </span>
-                                  </div>
-                                </td>
-
-                                <td className="py-3 px-4 text-right font-mono text-xs font-semibold">
-                                  {(item.totalMinutes / 60).toFixed(1)}h
-                                </td>
-                              </tr>
-
-                              {isExp && (
-                                <tr className={isDark ? "bg-slate-950/70" : "bg-slate-50"}>
-                                  <td colSpan="8" className="py-3 px-8">
-                                    {item.subtasks.length === 0 ? (
-                                      <p className="text-xs text-slate-400 italic">No sub-tasks defined for this deliverable.</p>
-                                    ) : (
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                                        {item.subtasks.map((sub, idx) => (
-                                          <div
-                                            key={sub.id}
-                                            className={`px-3 py-1.5 rounded-lg border text-xs flex items-center gap-2 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}
-                                          >
-                                            <span className={sub.done ? "text-emerald-500 font-bold" : "text-slate-400"}>
-                                              {sub.done ? "☑" : "☐"}
-                                            </span>
-                                            <span className={sub.done ? "line-through text-slate-400" : ""}>
-                                              {idx + 1}. {sub.title}
-                                            </span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </td>
-                                </tr>
-                              )}
-                            </React.Fragment>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* 3. LIVE ALL-EMPLOYEES DATE-BY-DATE LOG LEDGER (Exact Date, Name, Task & Hours) */}
+            {/* 3. LIVE ALL-EMPLOYEES DATE-BY-DATE LOG LEDGER */}
             {companyMasterMode === "DAILY_LOGS" && (
               <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
                 <div className="overflow-x-auto">
@@ -2241,18 +2557,19 @@ export default function App() {
                         <th className="py-3 px-4">Task / Activity Notes</th>
                         <th className="py-3 px-3">Project</th>
                         <th className="py-3 px-3">Tag</th>
-                        <th className="py-3 px-4 text-right">Time Logged</th>
+                        <th className="py-3 px-3 text-right">Time Logged</th>
+                        <th className="py-3 px-3 w-10"></th>
                       </tr>
                     </thead>
                     <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-200/70"}`}>
                       {allEmployeesDailyLogFeed.length === 0 ? (
                         <tr>
-                          <td colSpan="6" className="py-8 text-center text-slate-400 text-xs">
+                          <td colSpan="7" className="py-8 text-center text-slate-400 text-xs">
                             No logs recorded matching current filter.
                           </td>
                         </tr>
                       ) : (
-                        allEmployeesDailyLogFeed.slice(0, 30).map(log => {
+                        allEmployeesDailyLogFeed.slice(0, 40).map(log => {
                           const vt = Number(log.Task_Hours || 0);
                           const vl = Number(log.Learning_Hours || 0);
                           const mins = (vt > 24 ? vt : Math.round(vt * 60)) + (vl > 24 ? vl : Math.round(vl * 60));
@@ -2277,8 +2594,18 @@ export default function App() {
                                   {log.Task_Code || "#General"}
                                 </span>
                               </td>
-                              <td className="py-3 px-4 text-right font-mono font-bold text-emerald-500">
+                              <td className="py-3 px-3 text-right font-mono font-bold text-emerald-500">
                                 {(mins / 60).toFixed(1)}h ({mins}m)
+                              </td>
+                              <td className="py-3 px-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteActivityLog(log)}
+                                  title="Delete mistaken log entry"
+                                  className="text-slate-400 hover:text-rose-500 p-1"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
                               </td>
                             </tr>
                           );
@@ -2293,6 +2620,51 @@ export default function App() {
         )}
       </main>
 
+      {/* ================= RESCHEDULE TARGET DATE MODAL ================= */}
+      {rescheduleTarget && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`border rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4 text-xs ${isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"}`}>
+            <div className="flex justify-between items-center border-b pb-2 border-slate-200/40">
+              <div className="flex items-center gap-1.5 text-amber-500">
+                <Lock className="h-4 w-4" />
+                <h3 className="font-bold text-sm">Reschedule Target Date</h3>
+              </div>
+              <button type="button" onClick={() => setRescheduleTarget(null)}><X className="h-4 w-4 text-slate-400" /></button>
+            </div>
+            <p className="text-slate-400 leading-relaxed">
+              Moving target date for <strong>"{rescheduleTarget.Monday_Commitment}"</strong> (currently <strong>{normalizeDateStr(rescheduleTarget.Target_Deadline)}</strong>). Please enter the reason for shifting the deadline:
+            </p>
+            <form onSubmit={handleConfirmReschedule} className="space-y-3">
+              <div>
+                <label className="block mb-1 font-semibold">New Target Date</label>
+                <input
+                  required
+                  type="date"
+                  value={rescheduleNewDate}
+                  onChange={(e) => setRescheduleNewDate(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-xl border font-mono ${isDark ? "bg-slate-950 border-slate-700 text-white" : "bg-slate-50 border-slate-200"}`}
+                />
+              </div>
+              <div>
+                <label className="block mb-1 font-semibold">Reason for Delay / Reschedule</label>
+                <input
+                  required
+                  type="text"
+                  value={rescheduleReason}
+                  onChange={(e) => setRescheduleReason(e.target.value)}
+                  placeholder="e.g. School postponed workshop due to rain"
+                  className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-slate-950 border-slate-700 text-white" : "bg-slate-50 border-slate-200"}`}
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button type="button" onClick={() => setRescheduleTarget(null)} className="px-3 py-2 text-slate-400">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl">Update & Log Reason</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ================= TAGS & PROJECTS MANAGER DRAWER ================= */}
       {showLibraryManager && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -2305,7 +2677,6 @@ export default function App() {
               <button type="button" onClick={() => setShowLibraryManager(false)}><X className="h-4 w-4 text-slate-400" /></button>
             </div>
 
-            {/* Tags Library */}
             <div className="space-y-2.5">
               <h4 className="font-bold text-xs uppercase text-indigo-500 flex items-center gap-1.5">
                 <Tag className="h-3.5 w-3.5" /> Activity Tags Library ({tags.length})
@@ -2348,7 +2719,6 @@ export default function App() {
 
             <hr className={isDark ? "border-slate-800" : "border-slate-200"} />
 
-            {/* Projects Library */}
             <div className="space-y-2.5">
               <h4 className="font-bold text-xs uppercase text-indigo-500 flex items-center gap-1.5">
                 <FolderPlus className="h-3.5 w-3.5" /> Operational Projects ({projects.length})
@@ -2577,7 +2947,7 @@ export default function App() {
                 value={newEmp.name} 
                 onChange={e => setNewEmp({...newEmp, name: e.target.value})} 
                 className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} 
-                placeholder="Full Name (e.g. Durga Devi)" 
+                placeholder="Full Name (e.g. Ramya)" 
               />
               <input 
                 required 
@@ -2585,7 +2955,7 @@ export default function App() {
                 value={newEmp.email} 
                 onChange={e => setNewEmp({...newEmp, email: e.target.value})} 
                 className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} 
-                placeholder="Work Email (e.g. durga@infiniteengineers.in)" 
+                placeholder="Work Email (e.g. ramya@infiniteengineers.in)" 
               />
               <input 
                 required 
@@ -2593,7 +2963,7 @@ export default function App() {
                 value={newEmp.roleTitle} 
                 onChange={e => setNewEmp({...newEmp, roleTitle: e.target.value})} 
                 className={`w-full rounded-xl p-2.5 border ${isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200"}`} 
-                placeholder="Role Title (e.g. Lead STEM Facilitator)" 
+                placeholder="Role Title (e.g. HR & Operations)" 
               />
               <textarea 
                 rows="3" 
