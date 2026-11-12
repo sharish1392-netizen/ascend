@@ -9,7 +9,7 @@ import {
   Award, Settings, MapPin, Eye, Lock, Copy
 } from 'lucide-react';
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwkPorOfbnqoZp9IFIvSp2DEHwoN1V3vw5rlZFSsvQSJG16PkV3Kt6k9ywvBRSmvTWX/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz4v1XX9-m0Zu_xEgEzyeCI361wydctuHupDCxgPEhfDWuqgD-AtVrESJ-s6cE4kA2xtA/exec";
 
 const DEFAULT_PROJECTS = [
   { Project_ID: "PRJ-DEXTER", Project_Name: "Dexter Box", Full_Name: "Dexter Box Science Kits" },
@@ -250,6 +250,15 @@ export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("ie_theme") || "light");
   const [activeTab, setActiveTab] = useState("my_tasks");
   const [activeEmployeeEmail, setActiveEmployeeEmail] = useState(() => localStorage.getItem("ie_v3_active_emp") || "");
+  const activeEmpRef = useRef(activeEmployeeEmail);
+
+  useEffect(() => {
+    activeEmpRef.current = activeEmployeeEmail;
+    if (activeEmployeeEmail) {
+      localStorage.setItem("ie_v3_active_emp", activeEmployeeEmail);
+      setSelectedCollaborators([activeEmployeeEmail]);
+    }
+  }, [activeEmployeeEmail]);
 
   useEffect(() => { localStorage.setItem("ie_theme", theme); }, [theme]);
 
@@ -332,12 +341,6 @@ export default function App() {
   useEffect(() => { localStorage.setItem("ie_v8_tags", JSON.stringify(tags)); }, [tags]);
   useEffect(() => { localStorage.setItem("ie_v3_pulses", JSON.stringify(weeklyPulses)); }, [weeklyPulses]);
   useEffect(() => { localStorage.setItem("ie_v3_logs", JSON.stringify(dailyLogs)); }, [dailyLogs]);
-  useEffect(() => {
-    if (activeEmployeeEmail) {
-      localStorage.setItem("ie_v3_active_emp", activeEmployeeEmail);
-      setSelectedCollaborators([activeEmployeeEmail]);
-    }
-  }, [activeEmployeeEmail]);
 
   const fetchSheetData = async (silent = false) => {
     if (!silent) setIsLoading(true);
@@ -357,11 +360,15 @@ export default function App() {
           }
         });
 
-        const mergedEmployees = mergeById(Array.from(discoveredMap.values()), employees, "Email");
-        setEmployees(mergedEmployees);
-        if (!activeEmployeeEmail && mergedEmployees[0]) {
-          setActiveEmployeeEmail(mergedEmployees[0].Email);
-        }
+        setEmployees(prev => {
+          const merged = mergeById(Array.from(discoveredMap.values()), prev, "Email");
+          // Only set default employee if none is currently selected in ref or localStorage
+          const currentSelected = activeEmpRef.current || localStorage.getItem("ie_v3_active_emp");
+          if (!currentSelected && merged[0]) {
+            setActiveEmployeeEmail(merged[0].Email);
+          }
+          return merged;
+        });
 
         if (data.projects && data.projects.length > 0) {
           setProjects(prev => mergeById(data.projects, prev, "Project_ID"));
@@ -601,12 +608,13 @@ export default function App() {
     });
   }, [companyMasterTasks, companyFilterProject, companyFilterMember, companyFilterTag]);
 
+  // Fixed: Strict task title matching so shared Project + Tag tasks never double-count hours
   const computeTimesheetMatrix = (logsSubset, tasksSubset) => {
     const matrixRows = [];
 
     (tasksSubset || []).forEach(task => {
       if (!task) return;
-      const taskTitle = task.Monday_Commitment || task.title || "";
+      const taskTitle = (task.Monday_Commitment || task.title || "").trim();
       const taskPrj = task.Project_ID || task.projectId || "PRJ-MAKER";
       const taskTag = task.Task_Code || task.tag || "#General";
 
@@ -617,10 +625,13 @@ export default function App() {
         const matches = logsSubset.filter(l => {
           if (!l) return false;
           const lDate = normalizeDateStr(l.Date);
-          const isDateMatch = lDate === day.dateStr;
-          const isTaskMatch = (l.Notes || "").trim().toLowerCase() === taskTitle.trim().toLowerCase() ||
-                              (l.Project_ID === taskPrj && l.Task_Code === taskTag);
-          return isDateMatch && isTaskMatch;
+          if (lDate !== day.dateStr) return false;
+
+          const logNote = (l.Notes || l.Learning_Module_Code || "").trim().toLowerCase();
+          if (logNote && taskTitle) {
+            return logNote === taskTitle.toLowerCase();
+          }
+          return !logNote && l.Project_ID === taskPrj && l.Task_Code === taskTag;
         });
 
         matches.forEach(m => {
@@ -792,7 +803,6 @@ export default function App() {
     syncSubtasksAndProgress(rowItem, updated);
   };
 
-  // Duplicate / Copy Task Row (Restored Copy Symbol Action!)
   const handleDuplicateTaskRow = (rowItem) => {
     const copiedSubtasks = parseSubtasks(rowItem).map((s, idx) => ({
       ...s,
@@ -825,7 +835,6 @@ export default function App() {
     } catch (err) {}
   };
 
-  // Delete Task Row
   const handleDeleteTaskRow = (rowItem) => {
     setWeeklyPulses(prev => prev.filter(p => p.Pulse_ID !== rowItem.Pulse_ID));
     setConfirmDeleteId(null);
@@ -839,7 +848,6 @@ export default function App() {
     } catch (err) {}
   };
 
-  // Delete Mistaken Activity Log Entry
   const handleDeleteActivityLog = (logItem) => {
     setDailyLogs(prev => prev.filter(l => l.Log_ID !== logItem.Log_ID));
     showToast("Removed activity log entry!");
@@ -852,7 +860,6 @@ export default function App() {
     } catch (err) {}
   };
 
-  // Toggle Co-Owners on an Existing Task
   const handleToggleTaskCoOwner = (rowItem, targetEmail) => {
     const currentCollabs = (rowItem.Collaborators || rowItem.Emp_Email || "")
       .split(",")
@@ -907,7 +914,6 @@ export default function App() {
     }
   };
 
-  // Reschedule Target Date
   const handleConfirmReschedule = (e) => {
     e.preventDefault();
     if (!rescheduleTarget || !rescheduleNewDate || !rescheduleReason.trim()) return;
@@ -938,7 +944,6 @@ export default function App() {
     setRescheduleReason("");
   };
 
-  // 1-Tap Time Logging
   const handleQuickLogTimeOnRow = (rowItem, addMinutes, forceDone = false) => {
     const isLearning = rowItem.Project_ID === "UPSKILLING";
     const currentMins = Number(rowItem.Auto_Learning_Hours || 0) + addMinutes;
@@ -1039,7 +1044,6 @@ export default function App() {
     } catch (err) {}
   };
 
-  // Create Task Row
   const handleCreateTaskRow = (e) => {
     e.preventDefault();
     if (!quickTitle.trim()) return;
@@ -1090,7 +1094,6 @@ export default function App() {
     } catch (err) {}
   };
 
-  // Add Item to Learning Bucket
   const handleCreateLearningItem = (e) => {
     e.preventDefault();
     if (!newLearningTopic.trim()) return;
@@ -1125,7 +1128,6 @@ export default function App() {
     } catch (err) {}
   };
 
-  // Tag & Project Management
   const handleAddNewTag = () => {
     let t = newTagInput.trim();
     if (!t) return;
@@ -1197,7 +1199,6 @@ export default function App() {
     } catch (err) {}
   };
 
-  // Safe Add Employee Submit
   const handleAddEmployeeSubmit = (e) => {
     e.preventDefault();
     const cleanEmail = (newEmp.email || "").toLowerCase().trim();
@@ -1394,7 +1395,6 @@ export default function App() {
         {/* ================= TAB 1: MY TASKS & SUB-TASKS ================= */}
         {activeTab === "my_tasks" && (
           <div className="space-y-4">
-            {/* Task Entry Bar */}
             <form onSubmit={handleCreateTaskRow} className={`p-3.5 rounded-2xl border shadow-sm space-y-2.5 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                 <div className="sm:col-span-4">
@@ -1491,7 +1491,6 @@ export default function App() {
               )}
             </form>
 
-            {/* Task Table */}
             <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs sm:text-sm">
@@ -1557,7 +1556,6 @@ export default function App() {
 
                                   {isSchoolVisit && <MapPin className="h-3 w-3 text-indigo-500 shrink-0" />}
 
-                                  {/* Inline Editable Title */}
                                   {editingTitleId === row.Pulse_ID ? (
                                     <input
                                       autoFocus
@@ -1585,7 +1583,6 @@ export default function App() {
                                     </span>
                                   )}
 
-                                  {/* Co-Owner Pill Button */}
                                   <div className="relative inline-block">
                                     <button
                                       type="button"
@@ -1659,7 +1656,6 @@ export default function App() {
                                 />
                               </td>
 
-                              {/* Locked Target Date */}
                               <td className="py-3 px-3 text-xs font-mono">
                                 <button
                                   type="button"
@@ -1693,7 +1689,6 @@ export default function App() {
                                 {(mins / 60).toFixed(1)}h
                               </td>
 
-                              {/* Action Buttons + Copy Symbol + Delete */}
                               <td className="py-3 px-4 text-right">
                                 <div className="inline-flex items-center gap-1">
                                   {isSchoolVisit ? (
@@ -1740,7 +1735,6 @@ export default function App() {
                                     Done ✓
                                   </button>
 
-                                  {/* Copy Task Symbol Button */}
                                   <button
                                     type="button"
                                     onClick={() => handleDuplicateTaskRow(row)}
@@ -1750,7 +1744,6 @@ export default function App() {
                                     <Copy className="h-3.5 w-3.5" />
                                   </button>
 
-                                  {/* Delete Row Button */}
                                   {confirmDeleteId === row.Pulse_ID ? (
                                     <button
                                       type="button"
@@ -1773,7 +1766,6 @@ export default function App() {
                               </td>
                             </tr>
 
-                            {/* Sub-Tasks Drawer */}
                             {isExpanded && (
                               <tr className={isDark ? "bg-slate-950/70" : "bg-indigo-50/30"}>
                                 <td></td>
@@ -2231,7 +2223,6 @@ export default function App() {
         {/* ================= TAB 4: COMPANY MASTER VIEW ================= */}
         {activeTab === "company_master" && (
           <div className="space-y-5">
-            {/* WEEKLY LAUNCH TOWER WIDGET */}
             <div className={`p-5 rounded-2xl border shadow-sm space-y-4 ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3 border-slate-200/50">
                 <div>
@@ -2266,7 +2257,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Dynamic Filters & View Switcher */}
             <div className={`p-3 rounded-2xl border flex flex-wrap items-center justify-between gap-3 text-xs ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
               <div className="flex items-center gap-2 flex-wrap">
                 <div className={`flex p-0.5 rounded-lg border ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"}`}>
@@ -2333,7 +2323,6 @@ export default function App() {
               </span>
             </div>
 
-            {/* 1. DELIVERABLES & TARGET VS COMPLETION VARIANCE TABLE */}
             {companyMasterMode === "ROADMAP" && (
               <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
                 <div className="overflow-x-auto">
@@ -2484,7 +2473,6 @@ export default function App() {
               </div>
             )}
 
-            {/* 2. WEEKLY TIMESHEET MATRIX TABLE */}
             {companyMasterMode === "TIMESHEET" && (
               <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
                 <div className="overflow-x-auto">
@@ -2545,7 +2533,6 @@ export default function App() {
               </div>
             )}
 
-            {/* 3. LIVE ALL-EMPLOYEES DATE-BY-DATE LOG LEDGER */}
             {companyMasterMode === "DAILY_LOGS" && (
               <div className={`border rounded-2xl overflow-hidden shadow-sm ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}>
                 <div className="overflow-x-auto">
