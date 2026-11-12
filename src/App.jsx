@@ -9,7 +9,7 @@ import {
   Award, Settings, MapPin, Eye, Lock, Copy
 } from 'lucide-react';
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz4v1XX9-m0Zu_xEgEzyeCI361wydctuHupDCxgPEhfDWuqgD-AtVrESJ-s6cE4kA2xtA/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwkPorOfbnqoZp9IFIvSp2DEHwoN1V3vw5rlZFSsvQSJG16PkV3Kt6k9ywvBRSmvTWX/exec";
 
 const DEFAULT_PROJECTS = [
   { Project_ID: "PRJ-DEXTER", Project_Name: "Dexter Box", Full_Name: "Dexter Box Science Kits" },
